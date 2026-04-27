@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bubbly Dragon 🐉</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#090c13">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bubbly Dragon">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root {
+  --bg: #090c13;
+  --surface: #0f1520;
+  --surface2: #161e2c;
+  --border: rgba(255,255,255,0.07);
+  --text: #dde4ee;
+  --muted: #6b7888;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d29922;
+  --blue: #58a6ff;
+  --purple: #bc8cff;
+  --accent: #1a5c2a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: var(--blue); }
+
+/* Layout */
+.container { max-width: 1280px; margin: 0 auto; padding: 12px 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.card-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 6px; }
+.card-value { font-size: 20px; font-weight: 700; }
+.card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+/* Header */
+.header { background: var(--surface); border: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; border-radius: 8px; }
+.header-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--muted); }
+.btn { background: var(--accent); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.btn:hover { opacity: .85; }
+.btn:disabled { opacity: .4; cursor: default; }
+
+/* Section titles */
+h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 18px 0 8px; border-left: 2px solid var(--blue); padding-left: 8px; }
+
+/* Tier table */
+.tier-table { width: 100%; border-collapse: collapse; }
+.tier-table th { text-align: left; padding: 7px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.tier-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.tier-table tfoot td { border-bottom: none; border-top: 1px solid var(--border); font-weight: 700; }
+.tier-table tbody tr:hover td { background: var(--surface2); }
+.tier-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+.t0 { background:#0c1e2e; color:#58a6ff; }
+.t1 { background:#0c2018; color:#3fb950; }
+.t2 { background:#261a08; color:#d29922; }
+.t3a { background:#1a1028; color:#bc8cff; }
+.t3b { background:#240e14; color:#f0883e; }
+.t4 { background:#151a22; color:#8b949e; }
+.pct-bar-wrap { display: flex; align-items: center; }
+.pct-bar { height: 3px; border-radius: 2px; background: var(--blue); flex-shrink: 0; opacity: .6; }
+
+/* Leverage */
+.lev-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.lev-header h2 { margin: 0; border: none; padding: 0; }
+.lev-income { font-size: 11px; color: var(--muted); }
+.leverage-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+.lev-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; }
+.lev-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+.lev-eq { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.lev-body { display: flex; align-items: flex-end; justify-content: space-between; }
+.lev-actual { font-size: 26px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.lev-target-col { text-align: right; }
+.lev-target-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 3px; }
+.lev-target-val { font-size: 19px; font-weight: 700; line-height: 1; }
+.lev-green { color: var(--green); }
+.lev-yellow { color: var(--yellow); }
+.lev-red { color: var(--red); }
+.ok { color: var(--green); }
+.warn { color: var(--yellow); }
+.bad { color: var(--red); }
+
+/* Scorecard table */
+.sc-table { width: 100%; border-collapse: collapse; }
+.sc-table th { text-align: left; padding: 7px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); }
+.sc-table th:nth-child(2), .sc-table th:nth-child(3) { text-align: right; }
+.sc-table td { padding: 9px 14px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.sc-table td:nth-child(2), .sc-table td:nth-child(3) { text-align: right; font-variant-numeric: tabular-nums; }
+.sc-table tbody tr:not(.sc-section):last-child td { border-bottom: none; }
+.sc-table tbody tr:not(.sc-section):hover td { background: var(--surface2); }
+.sc-section td { padding: 4px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--yellow); background: var(--surface2); border-bottom: 1px solid var(--border); }
+.sc-green { color: var(--green) !important; font-weight: 700; }
+.sc-yellow { color: var(--yellow) !important; font-weight: 700; }
+.sc-red { color: var(--red) !important; font-weight: 700; }
+
+/* Holdings table */
+.holdings-wrap { overflow-x: auto; }
+.holdings-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.holdings-table th { text-align: right; padding: 7px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+.holdings-table th:first-child, .holdings-table th:nth-child(2), .holdings-table th:nth-child(3) { text-align: left; }
+.holdings-table th:hover { color: var(--text); }
+.holdings-table th.sort-asc::after { content: ' ↑'; }
+.holdings-table th.sort-desc::after { content: ' ↓'; }
+.holdings-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+.holdings-table td:first-child, .holdings-table td:nth-child(2), .holdings-table td:nth-child(3) { text-align: left; }
+.holdings-table tr:hover td { background: var(--surface2); }
+.holdings-table tfoot td { font-weight: 700; border-top: 1px solid var(--border); border-bottom: none; }
+.gain { color: var(--green); }
+.loss { color: var(--red); }
+.neutral { color: var(--muted); }
+
+/* Sector bars */
+.sector-row { display: flex; align-items: center; gap: 12px; margin-bottom: 7px; }
+.sector-name { width: 176px; flex-shrink: 0; font-size: 12px; }
+.sector-bar-bg { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+.sector-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.sector-pct { width: 38px; text-align: right; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Progress */
+.progress-wrap { margin-top: 6px; }
+.progress-bg { height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--green); border-radius: 2px; transition: width .4s; }
+
+/* Top metrics row 1 */
+.top-metrics { display: grid; grid-template-columns: repeat(6,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+.top-metric { background: var(--surface); padding: 10px 14px; }
+.top-metric-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-metric-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+
+/* Equation row */
+.eq-row { display: flex; align-items: stretch; margin-bottom: 12px; }
+.eq-card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; min-width: 0; }
+.eq-op { display: flex; align-items: center; justify-content: center; width: 30px; flex-shrink: 0; font-size: 17px; font-weight: 600; color: var(--muted); }
+.eq-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 5px; }
+.eq-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.eq-sub { font-size: 10px; color: var(--muted); }
+.tier-bar { display: flex; height: 3px; border-radius: 2px; overflow: hidden; margin-top: 10px; }
+.tier-bar span { height: 100%; }
+
+/* Loading / error */
+#loading { text-align: center; padding: 60px; color: var(--muted); }
+.error-box { background: #2d1a1a; border: 1px solid var(--red); border-radius: 8px; padding: 14px; color: var(--red); margin: 14px 0; }
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .top-metrics { grid-template-columns: repeat(3,1fr); }
+}
+@media (max-width: 900px) {
+  .grid-4 { grid-template-columns: repeat(2,1fr); }
+  .grid-3 { grid-template-columns: repeat(2,1fr); }
+  .sector-name { width: 130px; }
+  .lev-actual { font-size: 22px; }
+  .lev-target-val { font-size: 17px; }
+  .eq-value { font-size: 14px; }
+  .eq-op { width: 22px; font-size: 13px; }
+}
+@media (max-width: 600px) {
+  .top-metrics { grid-template-columns: repeat(2,1fr); }
+  .eq-row { flex-wrap: wrap; gap: 8px; }
+  .eq-card { flex: 1 1 40%; }
+  .eq-op { display: none; }
+  .grid-2, .grid-3, .grid-4, .leverage-grid { grid-template-columns: 1fr; }
+  .header { flex-direction: column; align-items: flex-start; }
+  .lev-header { flex-direction: column; gap: 2px; }
+  .lev-actual { font-size: 22px; }
+  .lev-target-val { font-size: 17px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div id="loading">データ読み込み中...</div>
+  <div id="dashboard" style="display:none"></div>
+</div>
+
+<script>
+// ── Data sources ──────────────────────────────────────────────────────────────
+const CLEAN_URL     = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFeps7odLkMfHb6Iyi4Cl2LTcYGbU/export?format=csv&gid=1838261664';
+const PORTFOLIO_URL = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFeps7odLkMfHb6Iyi4Cl2LTcYGbU/export?format=csv&gid=2040776062';
+
+// Hardcoded targets/goals not present in clean data:
+const PASSIVE_INCOME_TARGET = 831264;
+const TIER_GOAL = 60000000; // Stretch goal
+
+// Scorecard targets [name, target-string, pass-fn(value, raw)]
+const SCORECARD_TARGETS = [
+  { target: '>60%',  pass: v => v >= 60,    isNum: false },
+  { target: '>40%',  pass: v => v >= 40,    isNum: false },
+  { target: '<40%',  pass: v => v < 40,     isNum: false },
+  { target: '<10%',  pass: v => v < 10,     isNum: false },
+  { target: '¥4.0M', pass: v => v >= 4000000, isNum: true  },
+  { target: '<30%',  pass: v => v < 30,     isNum: false },
+  { target: '>2.5%', pass: v => v >= 2.5,   isNum: false },
+];
+
+// ── CSV parser (handles quoted fields) ───────────────────────────────────────
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQ) {
+      if (c === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (c === '"') inQ = false;
+      else field += c;
+    } else {
+      if (c === '"') { inQ = true; }
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c !== '\r') field += c;
+    }
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function num(s) { return parseFloat(String(s).replace(/[¥,x\s]/g, '')) || 0; }
+function pct(s) { return parseFloat(String(s).replace('%','')) || 0; }
+function fmt(n)  { return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+function fmtM(n) { return '¥' + (n/1000000).toFixed(2) + 'M'; }
+function fmtK(n) { return '¥' + Math.round(n/1000) + 'k'; }
+
+// ── Extract data from parsed CSV rows ────────────────────────────────────────
+function extract(rows, pfRows) {
+  const d = {};
+
+  // Row 0: exchange rate
+  d.exchangeRate = parseFloat(rows[0][0]) || 158.7;
+
+  // Rows 10-15: tiers (T0–T4), row 16: total, row 17: goal
+  const tierDefs = [
+    { id:'T0', color:'t0', labelEn:'Liquidity Buffer' },
+    { id:'T1', color:'t1', labelEn:'Core Portfolio' },
+    { id:'T2', color:'t2', labelEn:'Satellite' },
+    { id:'T3(a)', color:'t3a', labelEn:'Restricted (Retirement)' },
+    { id:'T3(b)', color:'t3b', labelEn:'Conditional Assets' },
+    { id:'T4', color:'t4', labelEn:'Real Estate' },
+  ];
+  d.tiers = tierDefs.map((def, i) => {
+    const r = rows[10 + i] || [];
+    return {
+      ...def,
+      desc: r[2] || '',
+      types: r[3] || '',
+      amount: num(r[4]),
+      pctNum: pct(r[5]),
+      pctStr: r[5] || '',
+    };
+  });
+  d.totalNetWorth = num((rows[16] || [])[4]);
+  d.netFinancialAssets = d.totalNetWorth - d.tiers[5].amount;
+
+  // Scorecard (same tier rows, cols 10-11)
+  d.scorecard = d.tiers.slice(0, 7).map((_, i) => {
+    const r = rows[10 + i] || [];
+    const name = r[10] || '';
+    const rawVal = r[11] || '';
+    const def = SCORECARD_TARGETS[i];
+    if (!name) return null;
+    const numVal = def.isNum ? num(rawVal) : pct(rawVal);
+    return { name, rawVal, numVal, ...def, pass: def.pass(numVal) };
+  }).filter(Boolean);
+
+  // NISA rows 17-18
+  const nisaRow = rows[17] || [];
+  const lifetimeRow = rows[18] || [];
+  d.nisa2026  = { name: nisaRow[10] || '2026年枠',    pctStr: nisaRow[11] || '', used: num(nisaRow[12]),   limit: num(nisaRow[13]) };
+  d.nisaLife  = { name: lifetimeRow[10] || '生涯投資枠', pctStr: lifetimeRow[11] || '', used: num(lifetimeRow[12]), limit: num(lifetimeRow[13]) };
+
+  // Real estate (rows 39-42)
+  const re = rows[39] || [], nw = rows[40] || [], di = rows[41] || [], ds = rows[42] || [];
+  const mRnd = v => '¥' + Math.round(v / 1000000) + 'M';
+  d.mortgage        = num(nw[3]);
+  d.realEstateValue = d.tiers[5].amount + d.mortgage;
+  d.annualIncome    = num(di[3]);
+  d.ltv       = { result: re[4]||'', actual: pct(re[4]), target: '<70%',  eq: `${mRnd(num(re[2])*10000)} ÷ ${mRnd(num(re[3])*10000)}` };
+  d.nwCoverage= { result: nw[4]||'', actual: pct(nw[4]), target: '>50%',  eq: `${mRnd(num(nw[2]))} ÷ ${mRnd(num(nw[3]))}` };
+  d.debtIncome= { result: di[4]||'', val: parseFloat((di[4]||'').replace('x','')||0), target: '<6x',    eq: `${mRnd(num(di[2]))} ÷ ${mRnd(num(di[3]))}` };
+  d.dscr      = { result: ds[4]||'', val: parseFloat((ds[4]||'').replace('x','')||0), target: '>2.0x',  eq: `${mRnd(num(ds[2]))} ÷ ${mRnd(num(ds[3]))}` };
+
+  // Holdings (rows 81–119)
+  d.holdings = [];
+  for (let i = 81; i < Math.min(rows.length, 121); i++) {
+    const r = rows[i];
+    if (!r || !r[1] || !r[2] || !r[3]) continue;
+    if (!r[1].match(/^T[0-9]/)) continue;
+    const val = num(r[4]);
+    const profit = num(r[5]);
+    d.holdings.push({
+      id: r[1], tier: r[2], name: r[3],
+      value: val, profit, profitPct: pct(r[6]),
+      shorthand: r[7] || r[3],
+      costBasis: val - profit,
+      colorCode: parseInt(r[9]) || 0,
+    });
+  }
+  d.totalGain = d.holdings.reduce((s, h) => s + h.profit, 0);
+
+  // Sectors (rows 47, 49, 51, 53, 55, 57, 59, 61 → indices)
+  d.sectors = [];
+  for (let i = 47; i <= 62; i += 2) {
+    const r = rows[i] || [];
+    if (!r[0] || isNaN(parseInt(r[0]))) continue;
+    d.sectors.push({ name: r[1] || '', alloc: pct(r[2]), dividend: pct(r[3]) });
+  }
+
+  // Dividend yield
+  d.dividendYield = pct((rows[16] || [])[11]);
+
+  // YTD gain, total gain, passive income — from portfolio new row 12 (0-indexed)
+  const pf13 = (pfRows && pfRows[12] ? pfRows[12] : []).filter(c => c.trim() !== '');
+  // non-empty values: [0]=totalNW, [1]=totalNW, [2]=NFA-mortgage, [3]=NFA, [4]=YTD, [5]=totalGain, [6]=passiveIncome
+  d.ytdGain             = num(pf13[4] || '0');
+  d.totalGain           = num(pf13[5] || '0');
+  const piStr           = pf13[6] || '';
+  const piParts         = piStr.split('/');
+  d.passiveIncomeActual = num(piParts[0] || '0') || 524004;
+  d.passiveIncomeTarget = num(piParts[1] || '0') || PASSIVE_INCOME_TARGET;
+
+  return d;
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+function colorClass(val) { return val > 0 ? 'gain' : val < 0 ? 'loss' : 'neutral'; }
+function sign(val) { return val > 0 ? '+' : ''; }
+function trafficLight(actual, target, higherIsBad) {
+  return (higherIsBad ? actual > target : actual < target) ? 'bad' : 'ok';
+}
+
+// Heat-map style matching portfolio new's color scale (-5 to +5)
+const HEAT = {
+  5:  'background:#052e10;color:#22c55e',
+  4:  'background:#073b14;color:#4ade80',
+  3:  'background:#0a4a1a;color:#86efac',
+  2:  'background:#0f5c22;color:#bbf7d0',
+  1:  'background:#1a6b2e;color:#dcfce7',
+  0:  'background:transparent;color:#8b949e',
+  '-1': 'background:#3b0a0a;color:#fee2e2',
+  '-2': 'background:#4d1010;color:#fca5a5',
+  '-3': 'background:#621414;color:#f87171',
+  '-4': 'background:#7a1818;color:#ef4444',
+  '-5': 'background:#1a0505;color:#dc2626',
+};
+function heatStyle(code) { return HEAT[code] || HEAT[0]; }
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function render(d) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+  const incomePct = Math.min(100, Math.round(d.passiveIncomeActual / d.passiveIncomeTarget * 100));
+
+  // Sort + pagination state
+  let sortKey = 'profit', sortDir = -1, page = 0;
+  const PAGE_SIZE = 10;
+
+  function sortedHoldings() {
+    return [...d.holdings].sort((a, b) => {
+      let va = a[sortKey], vb = b[sortKey];
+      if (typeof va === 'string') return va.localeCompare(vb, 'ja') * sortDir;
+      return (va - vb) * sortDir;
+    });
+  }
+
+  function holdingsRows() {
+    const all = sortedHoldings();
+    const slice = all.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+    return slice.map(h => `
+      <tr>
+        <td><span class="tier-badge ${tierColorClass(h.tier)}">${h.tier}</span></td>
+        <td title="${h.name}">${h.shorthand}</td>
+        <td>${fmt(h.value)}</td>
+        <td>${fmt(h.costBasis)}</td>
+        <td class="${colorClass(h.profit)}">${sign(h.profit)}${fmt(h.profit)}</td>
+        <td class="${colorClass(h.profitPct)}" style="font-weight:600">${sign(h.profitPct)}${h.profitPct.toFixed(0)}%</td>
+      </tr>`).join('');
+  }
+
+  function paginationBar() {
+    const total = sortedHoldings().length;
+    const totalPages = Math.ceil(total / PAGE_SIZE);
+    const start = page * PAGE_SIZE + 1;
+    const end = Math.min((page + 1) * PAGE_SIZE, total);
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 10px 0;flex-wrap:wrap;gap:8px">
+        <span style="font-size:12px;color:var(--muted)">${start}–${end} / ${total}銘柄</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="prevBtn" ${page === 0 ? 'disabled' : ''} style="padding:4px 12px;font-size:12px">← 前</button>
+          <span style="font-size:12px;color:var(--muted);align-self:center">${page + 1} / ${totalPages}</span>
+          <button class="btn" id="nextBtn" ${page >= totalPages - 1 ? 'disabled' : ''} style="padding:4px 12px;font-size:12px">次 →</button>
+        </div>
+      </div>`;
+  }
+
+  function holdingsTable() {
+    const cols = [
+      { key:'tier',      label:'Tier' },
+      { key:'shorthand', label:'銘柄' },
+      { key:'value',     label:'時価' },
+      { key:'costBasis', label:'簿価' },
+      { key:'profit',    label:'損益' },
+      { key:'profitPct', label:'損益率' },
+    ];
+    const ths = cols.map(c => {
+      const cls = sortKey === c.key ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
+      return `<th class="${cls}" data-key="${c.key}">${c.label}</th>`;
+    }).join('');
+    return `
+      <div class="card" style="padding:0;overflow:visible">
+        ${paginationBar()}
+        <div class="holdings-wrap" style="margin-top:8px">
+          <table class="holdings-table" id="htable">
+            <thead><tr>${ths}</tr></thead>
+            <tbody id="htbody">${holdingsRows()}</tbody>
+            <tfoot><tr>
+              <td colspan="2">合計 (${d.holdings.length}銘柄)</td>
+              <td>${fmt(d.holdings.reduce((s,h) => s+h.value, 0))}</td>
+              <td>${fmt(d.holdings.reduce((s,h) => s+h.costBasis, 0))}</td>
+              <td class="${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}</td>
+              <td></td>
+            </tr></tfoot>
+          </table>
+        </div>
+        ${paginationBar()}
+      </div>`;
+  }
+
+
+  const html = `
+    <div class="header">
+      <div class="header-title">🐉 Bubbly Dragon</div>
+      <div class="header-meta">
+        <span class="badge">USD/JPY ${d.exchangeRate.toFixed(2)}</span>
+        <span class="badge">${dateStr}</span>
+        <button class="btn" id="refreshBtn">↻ 更新</button>
+      </div>
+    </div>
+
+    <!-- Row 1: 6 summary metrics -->
+    ${(()=>{
+      const nfaMinusMortgage = d.netFinancialAssets - d.mortgage;
+      const TIER_COLORS = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
+      function tierBar(tiers) {
+        const total = tiers.reduce((s,t) => s + t.amount, 0);
+        return `<div class="tier-bar">${tiers.map(t =>
+          `<span style="width:${(t.amount/total*100).toFixed(2)}%;background:${TIER_COLORS[t.id]||'#555'}"></span>`
+        ).join('')}</div>`;
+      }
+      const nfaTiers  = d.tiers.slice(0, 5); // T0–T3b
+      const allTiers  = d.tiers;             // T0–T4
+
+      return `
+      <div class="top-metrics">
+        <div class="top-metric">
+          <div class="top-metric-title">純資産合計</div>
+          <div class="top-metric-value">${fmt(d.totalNetWorth)}</div>
+        </div>
+        <div class="top-metric">
+          <div class="top-metric-title">純金融資産 - 住宅ローン</div>
+          <div class="top-metric-value loss">${fmt(nfaMinusMortgage)}</div>
+        </div>
+        <div class="top-metric">
+          <div class="top-metric-title">純金融資産</div>
+          <div class="top-metric-value gain">${fmt(d.netFinancialAssets)}</div>
+        </div>
+        <div class="top-metric">
+          <div class="top-metric-title">YTD損益</div>
+          <div class="top-metric-value ${colorClass(d.ytdGain)}">${sign(d.ytdGain)}${fmt(d.ytdGain)}</div>
+        </div>
+        <div class="top-metric">
+          <div class="top-metric-title">全体損益</div>
+          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}</div>
+        </div>
+        <div class="top-metric">
+          <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
+          <div class="top-metric-value">${fmt(d.passiveIncomeActual)} / ${fmt(d.passiveIncomeTarget)}</div>
+        </div>
+      </div>
+
+      <!-- Row 2: equation -->
+      <div class="eq-row">
+        <div class="eq-card">
+          <div class="eq-title">純金融資産</div>
+          <div class="eq-value gain">${fmt(d.netFinancialAssets)}</div>
+          <div class="eq-sub">T0 + T1 + T2 + T3(a) + T3(b)</div>
+          ${tierBar(nfaTiers)}
+        </div>
+        <div class="eq-op">+</div>
+        <div class="eq-card">
+          <div class="eq-title">不動産価値</div>
+          <div class="eq-value gain">${fmt(d.realEstateValue)}</div>
+          <div class="eq-sub">土地価格＋建物減価償却</div>
+          ${tierBar([d.tiers[5]])}
+        </div>
+        <div class="eq-op" style="color:var(--red)">-</div>
+        <div class="eq-card">
+          <div class="eq-title">住宅ローン残高</div>
+          <div class="eq-value loss">${fmt(d.mortgage)}</div>
+          <div class="eq-sub">0.93% | 40年 | 元利金等</div>
+          <div class="tier-bar"><span style="width:100%;background:var(--red)"></span></div>
+        </div>
+        <div class="eq-op">=</div>
+        <div class="eq-card">
+          <div class="eq-title">純資産合計</div>
+          <div class="eq-value gain">${fmt(d.totalNetWorth)}</div>
+          <div class="eq-sub">T0〜T4 全部合計</div>
+          ${tierBar(allTiers)}
+        </div>
+      </div>`;
+    })()}
+
+    <!-- Asset Tiers -->
+    <h2>資産 Tier</h2>
+    <div class="card" style="padding:0;overflow-x:auto;">
+      <table class="tier-table">
+        <thead><tr>
+          <th>Tier</th><th>カテゴリ</th><th>資産種別</th>
+          <th style="text-align:right">金額</th>
+          <th style="text-align:right">比率</th>
+          <th style="min-width:120px"></th>
+        </tr></thead>
+        <tbody>
+          ${d.tiers.map(t => `
+          <tr>
+            <td><span class="tier-badge ${t.color}">${t.id}</span></td>
+            <td>${t.desc}</td>
+            <td style="color:var(--muted);font-size:12px">${t.types}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(t.amount)}</td>
+            <td style="text-align:right">${t.pctStr}</td>
+            <td>
+              <div class="pct-bar-wrap">
+                <div class="pct-bar" style="width:${t.pctNum}px;max-width:120px"></div>
+              </div>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" style="font-weight:700">合計</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(d.totalNetWorth)}</td>
+            <td style="text-align:right">100%</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Leverage & Real Estate -->
+    ${(()=>{
+      function lc(metric) {
+        if (metric === 'ltv')  return d.ltv.actual > 80       ? 'lev-red'    : d.ltv.actual > 70       ? 'lev-yellow' : 'lev-green';
+        if (metric === 'nw')   return d.nwCoverage.actual < 35 ? 'lev-red'   : d.nwCoverage.actual < 50 ? 'lev-yellow' : 'lev-green';
+        if (metric === 'di')   return d.debtIncome.val > 7     ? 'lev-red'   : d.debtIncome.val >= 5    ? 'lev-yellow' : 'lev-green';
+        if (metric === 'dscr') return d.dscr.val < 2           ? 'lev-red'   : d.dscr.val < 3           ? 'lev-yellow' : 'lev-green';
+      }
+      function levCard(title, eq, actual, target, metric) {
+        const cls = lc(metric);
+        return `
+          <div class="lev-card">
+            <div class="lev-title">${title}</div>
+            <div class="lev-eq">${eq}</div>
+            <div class="lev-body">
+              <div class="lev-actual ${cls}">${actual}</div>
+              <div class="lev-target-col">
+                <div class="lev-target-label">目標</div>
+                <div class="lev-target-val ${cls}">${target}</div>
+              </div>
+            </div>
+          </div>`;
+      }
+      return `
+      <div class="lev-header">
+        <h2 style="margin:20px 0 10px;border-left:3px solid var(--blue);padding-left:10px;font-size:15px;font-weight:600">レバレッジ健全性</h2>
+        <span class="lev-income">本年度年収：${fmtM(d.annualIncome)}</span>
+      </div>
+      <div class="leverage-grid">
+        ${levCard('LTV（自己持分）',     d.ltv.eq,        d.ltv.result,        d.ltv.target,        'ltv')}
+        ${levCard('純資産カバー率',       d.nwCoverage.eq, d.nwCoverage.result, d.nwCoverage.target, 'nw')}
+        ${levCard('総責務÷年収',         d.debtIncome.eq, d.debtIncome.result, d.debtIncome.target, 'di')}
+        ${levCard('DSCR（手取÷返済）',  d.dscr.eq,       d.dscr.result,       d.dscr.target,       'dscr')}
+      </div>`;
+    })()}
+
+    <!-- Scorecard -->
+    <h2>スコアカード</h2>
+    ${(()=>{
+      const sc = d.scorecard;
+      function scColor(rawVal, passFn, warnFn, isNum) {
+        const v = isNum ? num(rawVal) : pct(rawVal);
+        if (passFn(v)) return 'sc-green';
+        if (warnFn && warnFn(v)) return 'sc-yellow';
+        return 'sc-red';
+      }
+      function scRow(label, target, display, cls) {
+        return `<tr><td>${label}</td><td style="color:var(--muted)">${target}</td><td class="${cls}">${display}</td></tr>`;
+      }
+      const fmtMOne = v => '¥' + (v/1000000).toFixed(1) + 'M';
+      const s0 = sc[0]||{}, s1 = sc[1]||{}, s2 = sc[2]||{}, s3 = sc[3]||{},
+            s4 = sc[4]||{}, s5 = sc[5]||{}, s6 = sc[6]||{};
+      return `
+      <div class="card" style="padding:0;overflow-x:auto">
+        <table class="sc-table">
+          <thead><tr><th>項目</th><th>目標</th><th>実績</th></tr></thead>
+          <tbody>
+            <tr class="sc-section"><td colspan="3">──  運用資産（T1 + T2）割合  ──</td></tr>
+            ${scRow('コア比率 (T1%)',      '>60%',   s0.rawVal||'', scColor(s0.rawVal||'', v=>v>=60, v=>v>=50, false))}
+            ${scRow('分散度 (投信%)',      '>40%',   s1.rawVal||'', scColor(s1.rawVal||'', v=>v>=40, v=>v>=30, false))}
+            ${scRow('集中度 (個別株%)',    '<40%',   s2.rawVal||'', scColor(s2.rawVal||'', v=>v<40,  v=>v<50,  false))}
+            ${scRow('銘柄上限',            '<10%',   s3.rawVal||'', scColor(s3.rawVal||'', v=>v<10,  v=>v<12,  false))}
+            ${scRow('銘柄上限（RSU除く）', '<5.0%',  '0.0%',        'sc-green')}
+            <tr class="sc-section"><td colspan="3">──  配当周り・ガードレール  ──</td></tr>
+            ${scRow('生活防衛資金（T0）',      '¥4.0M', fmtMOne(num(s4.rawVal||'0')), scColor(s4.rawVal||'0', v=>v>=4000000, v=>v>=3000000, true))}
+            ${scRow('現金比率（HYSA÷T1）', '<30%',   s5.rawVal||'', scColor(s5.rawVal||'', v=>v<30,  v=>v<35,  false))}
+            ${scRow('配当利回り',           '>2.5%',  s6.rawVal||'', scColor(s6.rawVal||'', v=>v>=2.5,v=>v>=2,  false))}
+            <tr class="sc-section"><td colspan="3">──  NISA関係  ──</td></tr>
+            ${scRow('2026年投資枠', '¥36M', d.nisa2026.pctStr, 'sc-yellow')}
+            ${scRow('生涯投資枠',   '¥18M', d.nisaLife.pctStr,  'sc-yellow')}
+          </tbody>
+        </table>
+      </div>`;
+    })()}
+
+    <!-- Sector Allocation -->
+    <h2>セクター配分</h2>
+    <div class="card">
+      ${d.sectors.map(s => `
+      <div class="sector-row">
+        <div class="sector-name">${s.name}</div>
+        <div class="sector-bar-bg">
+          <div class="sector-bar-fill" style="width:${Math.min(100, s.alloc * 5)}%;background:${s.alloc >= 15 ? 'var(--red)' : s.alloc >= 13 ? 'var(--yellow)' : 'var(--green)'}"></div>
+        </div>
+        <div class="sector-pct">${s.alloc.toFixed(1)}%</div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Holdings -->
+    <h2>保有銘柄一覧</h2>
+    ${holdingsTable()}
+
+    <div style="height:32px"></div>
+  `;
+
+  document.getElementById('dashboard').innerHTML = html;
+
+  function bindHoldingsEvents() {
+    // Sort
+    document.getElementById('htable').querySelector('thead').addEventListener('click', e => {
+      const th = e.target.closest('th');
+      if (!th || !th.dataset.key) return;
+      if (sortKey === th.dataset.key) sortDir *= -1;
+      else { sortKey = th.dataset.key; sortDir = 1; page = 0; }
+      rebuildHoldings();
+    });
+    // Pagination
+    document.getElementById('dashboard').addEventListener('click', e => {
+      if (e.target.id === 'prevBtn' && page > 0) { page--; rebuildHoldings(); }
+      if (e.target.id === 'nextBtn') { page++; rebuildHoldings(); }
+    });
+  }
+
+  function rebuildHoldings() {
+    const wrap = document.getElementById('htable').closest('.card');
+    wrap.innerHTML = `
+      ${paginationBar()}
+      <div class="holdings-wrap" style="margin-top:8px">
+        <table class="holdings-table" id="htable">
+          <thead><tr>${
+            [['tier','Tier'],['shorthand','銘柄'],['value','時価'],['costBasis','簿価'],['profit','損益'],['profitPct','損益率']]
+            .map(([key,label]) => {
+              const cls = sortKey === key ? (sortDir===1?'sort-asc':'sort-desc') : '';
+              return `<th class="${cls}" data-key="${key}">${label}</th>`;
+            }).join('')
+          }</tr></thead>
+          <tbody id="htbody">${holdingsRows()}</tbody>
+          <tfoot><tr>
+            <td colspan="2">合計 (${d.holdings.length}銘柄)</td>
+            <td>${fmt(d.holdings.reduce((s,h)=>s+h.value,0))}</td>
+            <td>${fmt(d.holdings.reduce((s,h)=>s+h.costBasis,0))}</td>
+            <td class="${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+      </div>
+      ${paginationBar()}`;
+  }
+
+  bindHoldingsEvents();
+
+  // Refresh button
+  document.getElementById('refreshBtn').addEventListener('click', () => loadAndRender());
+}
+
+function tierColorClass(tier) {
+  const map = { 'T0':'t0','T1':'t1','T2':'t2','T3 (a)':'t3a','T3(a)':'t3a','T3 (b)':'t3b','T3(b)':'t3b','T4':'t4' };
+  return map[tier] || 't0';
+}
+
+// ── Load & render ─────────────────────────────────────────────────────────────
+async function loadAndRender() {
+  const loadEl = document.getElementById('loading');
+  const dashEl = document.getElementById('dashboard');
+  const btn = document.getElementById('refreshBtn');
+  if (btn) btn.disabled = true;
+  loadEl.style.display = 'block';
+  loadEl.textContent = 'データ読み込み中...';
+  dashEl.style.display = 'none';
+  try {
+    const [cleanRes, pfRes] = await Promise.all([fetch(CLEAN_URL), fetch(PORTFOLIO_URL)]);
+    if (!cleanRes.ok) throw new Error(`HTTP ${cleanRes.status}`);
+    const [cleanText, pfText] = await Promise.all([cleanRes.text(), pfRes.text()]);
+    const data = extract(parseCSV(cleanText), parseCSV(pfText));
+    loadEl.style.display = 'none';
+    dashEl.style.display = 'block';
+    render(data);
+  } catch (err) {
+    loadEl.innerHTML = `<div class="error-box">⚠️ データの読み込みに失敗しました: ${err.message}<br>スプレッドシートが公開設定になっているか確認してください。</div>`;
+  }
+}
+
+loadAndRender();
+</script>
+<script>
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+</script>
+</body>
+</html>
