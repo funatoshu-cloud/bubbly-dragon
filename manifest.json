@@ -1,6 +1,6 @@
 {
-  "name": "Bubbly Dragon",
-  "short_name": "Dragon",
+  "name": "Wealthtrack",
+  "short_name": "Wealthtrack",
   "description": "Personal finance portfolio dashboard",
   "start_url": "./",
   "display": "standalone",
