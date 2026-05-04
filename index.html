@@ -3,12 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wealthtrack</title>
+<title>WealthTrack</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png">
 <meta name="theme-color" content="#090c13">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Wealthtrack">
+<meta name="apple-mobile-web-app-title" content="WealthTrack">
 <link rel="apple-touch-icon" href="icon-192.png">
 <style>
 :root {
@@ -43,7 +45,8 @@ a { color: var(--blue); }
 
 /* Header */
 .header { background: var(--surface); border: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; border-radius: 8px; }
-.header-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+.header-title { font-size: 15px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 7px; }
+.header-title svg { width: 22px; height: 22px; flex-shrink: 0; }
 .header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--muted); }
 .btn { background: var(--accent); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
@@ -796,7 +799,20 @@ function render(d) {
   const html = `
     <div class="header">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-        <div class="header-title">Wealthtrack</div>
+        <div class="header-title">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <!-- bars -->
+            <rect x="4"  y="72" width="16" height="24" rx="3" fill="#13d2a2"/>
+            <rect x="27" y="54" width="16" height="42" rx="3" fill="#17daa9"/>
+            <rect x="50" y="36" width="16" height="60" rx="3" fill="#1be4b1"/>
+            <rect x="73" y="18" width="16" height="78" rx="3" fill="#22f0c8"/>
+            <!-- arrow line -->
+            <polyline points="7,76 22,54 38,30 68,12" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- arrowhead -->
+            <polygon points="87,3 72,22 61,7" fill="#fff"/>
+          </svg>
+          WealthTrack
+        </div>
         <div class="tabs">
           <button class="tab active" id="tabDash">Dashboard</button>
           <button class="tab" id="tabProj">Projection</button>

@@ -1,6 +1,6 @@
 {
-  "name": "Wealthtrack",
-  "short_name": "Wealthtrack",
+  "name": "WealthTrack",
+  "short_name": "WealthTrack",
   "description": "Personal finance portfolio dashboard",
   "start_url": "./",
   "display": "standalone",
