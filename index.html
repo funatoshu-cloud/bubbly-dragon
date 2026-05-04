@@ -420,6 +420,8 @@ function renderProjection(d, history) {
   }).join('');
 
   const nowYM=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+  function horizonYM(yrs){const n=new Date();let y=n.getFullYear()+yrs,m=n.getMonth()+1;return `${y}-${String(m).padStart(2,'0')}`;}
+  const defaultHorizon=10;
 
   el.innerHTML=`
     ${warnHtml}
@@ -437,7 +439,7 @@ function renderProjection(d, history) {
       </div>
       <div class="proj-group" id="pStopGroup">
         <span class="proj-label">Stop contributing from</span>
-        <input type="month" id="pStopDate" class="proj-number" value="${nowYM}">
+        <input type="month" id="pStopDate" class="proj-number" value="${horizonYM(defaultHorizon)}">
       </div>
       <div class="proj-group">
         <span class="proj-label">NW target (¥)</span>
@@ -541,7 +543,21 @@ function renderProjection(d, history) {
     document.getElementById('pTfoot').innerHTML=`<td>Total (${excludeRE?'純金融資産':'NW'})</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
   }
 
-  ['pHorizon','pContrib','pStopDate','pTarget','pExcludeRE'].forEach(id=>{
+  // Track whether user has manually overridden the stop date
+  let stopDateUserSet=false;
+  const stopDateEl=document.getElementById('pStopDate');
+  if(stopDateEl) stopDateEl.addEventListener('change',()=>{ stopDateUserSet=true; });
+
+  const horizonEl=document.getElementById('pHorizon');
+  if(horizonEl) horizonEl.addEventListener('input',()=>{
+    if(!stopDateUserSet && stopDateEl){
+      const yrs=parseInt(horizonEl.value)||10;
+      stopDateEl.value=horizonYM(yrs);
+    }
+    rebuild();
+  });
+
+  ['pContrib','pStopDate','pTarget','pExcludeRE'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.addEventListener('input',rebuild); el.addEventListener('change',rebuild);
   });
