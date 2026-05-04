@@ -150,6 +150,34 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 #loading { text-align: center; padding: 60px; color: var(--muted); }
 .error-box { background: #2d1a1a; border: 1px solid var(--red); border-radius: 8px; padding: 14px; color: var(--red); margin: 14px 0; }
 
+/* Tab switcher */
+.tabs { display:flex; gap:2px; background:var(--surface2); border-radius:6px; padding:3px; }
+.tab { padding:5px 16px; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:var(--muted); letter-spacing:.02em; transition:background .15s,color .15s; }
+.tab.active { background:var(--surface); color:var(--text); }
+
+/* Projection panel */
+.proj-warning { border-radius:6px; padding:10px 14px; font-size:12px; margin-bottom:12px; border:1px solid; }
+.proj-warning.red { background:rgba(248,81,73,.1); border-color:var(--red); color:var(--red); }
+.proj-warning.yellow { background:rgba(210,153,34,.1); border-color:var(--yellow); color:var(--yellow); }
+.proj-inputs { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
+.proj-group { display:flex; flex-direction:column; gap:5px; }
+.proj-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.proj-select,.proj-number { background:var(--surface2); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 10px; font-size:13px; }
+.proj-select { min-width:160px; } .proj-number { width:150px; }
+input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
+.proj-table { width:100%; border-collapse:collapse; }
+.proj-table th { text-align:right; padding:6px 12px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); border-bottom:1px solid var(--border); }
+.proj-table th:first-child { text-align:left; }
+.proj-table td { padding:8px 12px; border-bottom:1px solid var(--border); text-align:right; font-variant-numeric:tabular-nums; font-size:13px; }
+.proj-table td:first-child { text-align:left; }
+.proj-table tfoot td { font-weight:700; border-top:1px solid var(--border); border-bottom:none; }
+.manual-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:8px; margin-bottom:14px; }
+.manual-card { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+.manual-card-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:7px; }
+.manual-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.manual-row label { font-size:11px; color:var(--muted); width:58px; flex-shrink:0; }
+.manual-row input { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:3px 7px; font-size:12px; width:80px; }
+
 /* Responsive */
 @media (max-width: 1000px) {
   .top-metrics { grid-template-columns: repeat(3,1fr); }
@@ -186,6 +214,295 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 // ── Data sources ──────────────────────────────────────────────────────────────
 const CLEAN_URL     = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFeps7odLkMfHb6Iyi4Cl2LTcYGbU/export?format=csv&gid=1838261664';
 const PORTFOLIO_URL = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFeps7odLkMfHb6Iyi4Cl2LTcYGbU/export?format=csv&gid=2040776062';
+const HISTORY_URL   = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFeps7odLkMfHb6Iyi4Cl2LTcYGbU/export?format=csv&gid=58449373';
+
+// History column indices (0=date, then per schema)
+const HCOL = { t1_index_value:1,t1_index_cost:2,t2_value:3,t2_cost:4,t3a_ideco_value:5,t3a_ideco_cost:6,t4_land:7,t4_building:8,t4_mortgage:9,t0_value:10,t1_gold:11,t1_hysa:12,t3a_insurance:13,t3b_value:14 };
+const MONTHLY_COLS = ['t0_value','t1_gold','t1_hysa','t3a_insurance','t3b_value'];
+let _history = [];
+
+function parseHistory(rows) {
+  const data = [];
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    if (!r || !r[0]) continue;
+    const entry = { date: new Date(r[0]) };
+    for (const [col, idx] of Object.entries(HCOL)) {
+      const v = r[idx] ? parseFloat(String(r[idx]).replace(/[¥,%x,]/g,'')) : null;
+      entry[col] = (v !== null && !isNaN(v)) ? v : null;
+    }
+    data.push(entry);
+  }
+  // Forward-fill monthly columns
+  for (const col of MONTHLY_COLS) {
+    let last = null;
+    for (const row of data) { if (row[col] !== null) last = row[col]; else row[col] = last; }
+  }
+  return data;
+}
+
+function arrMedian(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b), m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+function arrStddev(arr) {
+  if (arr.length < 2) return 0;
+  const mean = arr.reduce((s,v)=>s+v,0)/arr.length;
+  return Math.sqrt(arr.reduce((s,v)=>s+(v-mean)**2,0)/(arr.length-1));
+}
+
+function computeRates(history) {
+  if (history.length < 2) return null;
+  const rates = {};
+
+  // Investment buckets: daily value + cost tracking
+  for (const [key, vCol, cCol] of [['t1_index','t1_index_value','t1_index_cost'],['t2','t2_value','t2_cost'],['t3a_ideco','t3a_ideco_value','t3a_ideco_cost']]) {
+    const dailyReturns=[], monthlyContribs=[];
+    let pv=null,pc=null,pm=null;
+    for (const row of history) {
+      const v=row[vCol], c=row[cCol];
+      if (v!==null && c!==null && pv!==null && pc!==null && pv>0 && v!==pv) {
+        // Pure investment return: Δ(value-cost) / prev_value
+        dailyReturns.push(((v-c)-(pv-pc))/pv);
+      }
+      const rm = row.date.getFullYear()*12+row.date.getMonth();
+      if (pm!==null && rm!==pm && pc!==null && c!==null && c>pc) monthlyContribs.push(c-pc);
+      if (v!==null) pv=v; if (c!==null) pc=c; pm=rm;
+    }
+    const med=arrMedian(dailyReturns), sd=arrStddev(dailyReturns);
+    const filt=dailyReturns.filter(r=>Math.abs(r-med)<=3*sd);
+    const last=history[history.length-1];
+    rates[key]={ annualBase:arrMedian(filt)*252, annualSigma:arrStddev(filt)*Math.sqrt(252), monthlyContrib:arrMedian(monthlyContribs)||0, currentValue:last[vCol]||0 };
+  }
+
+  // T4 equity = land + building - mortgage (exclude 繰上げ返済 days)
+  const mortDeltas=[];
+  for (let i=1;i<history.length;i++) { const d=history[i].t4_mortgage-history[i-1].t4_mortgage; if(d<0) mortDeltas.push(Math.abs(d)); }
+  const typicalPmt=arrMedian(mortDeltas)||1;
+  const t4Returns=[];
+  for (let i=1;i<history.length;i++) {
+    const p=history[i-1],c=history[i];
+    if([p.t4_land,p.t4_building,p.t4_mortgage,c.t4_land,c.t4_building,c.t4_mortgage].some(v=>v===null)) continue;
+    if(Math.abs(c.t4_mortgage-p.t4_mortgage)>2*typicalPmt) continue; // skip 繰上げ返済
+    const eq0=p.t4_land+p.t4_building-p.t4_mortgage, eq1=c.t4_land+c.t4_building-c.t4_mortgage;
+    if(eq0>0 && eq0!==eq1) t4Returns.push((eq1-eq0)/eq0);
+  }
+  const t4Med=arrMedian(t4Returns), t4Sd=arrStddev(t4Returns);
+  const t4Filt=t4Returns.filter(r=>Math.abs(r-t4Med)<=3*t4Sd);
+  const last=history[history.length-1];
+  rates.t4={ annualBase:arrMedian(t4Filt)*365, annualSigma:arrStddev(t4Filt)*Math.sqrt(365), monthlyContrib:0, currentValue:(last.t4_land||0)+(last.t4_building||0)-(last.t4_mortgage||0) };
+
+  // Monthly buckets: simple ΔV/V
+  for (const [key,col] of [['t0','t0_value'],['t1_hysa','t1_hysa'],['t1_gold','t1_gold'],['t3a_insurance','t3a_insurance'],['t3b','t3b_value']]) {
+    const returns=[]; let prev=null;
+    for (const row of history) { const v=row[col]; if(v!==null){if(prev!==null&&prev>0&&v!==prev) returns.push((v-prev)/prev); prev=v;} }
+    rates[key]={ annualBase:arrMedian(returns)*12, annualSigma:arrStddev(returns)*Math.sqrt(12), monthlyContrib:0, currentValue:last[col]||0 };
+  }
+  return rates;
+}
+
+function projectBucket(currentVal, monthlyContrib, annualRate, months) {
+  const r=annualRate/12;
+  if(Math.abs(r)<0.000001) return currentVal+monthlyContrib*months;
+  const g=Math.pow(1+r,months);
+  return currentVal*g+monthlyContrib*(g-1)/r;
+}
+
+function buildProjection(rates, months, contribMode) {
+  const KEYS=['t1_index','t2','t3a_ideco','t4','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
+  const result=[];
+  for(let m=0;m<=months;m++){
+    let base=0,opt=0,pess=0;
+    for(const key of KEYS){
+      const r=rates[key]; if(!r) continue;
+      const contrib=contribMode==='stopped'?0:r.monthlyContrib;
+      base +=projectBucket(r.currentValue,contrib,r.annualBase,m);
+      opt  +=projectBucket(r.currentValue,contrib,r.annualBase+r.annualSigma,m);
+      pess +=projectBucket(r.currentValue,contrib,r.annualBase-r.annualSigma,m);
+    }
+    result.push({month:m,base,optimistic:opt,pessimistic:pess});
+  }
+  return result;
+}
+
+function buildChart(projData, currentNW, targetNW) {
+  const W=800,H=260,PL=72,PR=20,PT=20,PB=40;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const months=projData[projData.length-1].month;
+  const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
+  if(targetNW) allV.push(targetNW);
+  const minV=Math.min(...allV)*0.97, maxV=Math.max(...allV)*1.03;
+  const xs=m=>PL+(m/months)*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+
+  const line=(key,color,dash='')=>{
+    const d=projData.map(p=>`${xs(p.month).toFixed(1)},${ys(p[key]).toFixed(1)}`).join(' ');
+    return `<polyline points="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"${dash?` stroke-dasharray="${dash}"`:''}/>`;
+  };
+  const bandPts=[...projData.map(p=>`${xs(p.month).toFixed(1)},${ys(p.optimistic).toFixed(1)}`),
+                 ...[...projData].reverse().map(p=>`${xs(p.month).toFixed(1)},${ys(p.pessimistic).toFixed(1)}`)].join(' ');
+
+  let grid='',yLbl='';
+  for(let i=0;i<=5;i++){
+    const v=minV+(maxV-minV)*(i/5), y=ys(v).toFixed(1);
+    grid+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.05)"/>`;
+    yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${(v/1000000).toFixed(0)}M</text>`;
+  }
+  let xLbl='';
+  for(let yr=0;yr<=Math.floor(months/12);yr++){
+    const x=xs(yr*12).toFixed(1);
+    xLbl+=`<text x="${x}" y="${H-PB+16}" text-anchor="middle" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
+    if(yr>0) grid+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
+  }
+  const todayLine=`<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.2)" stroke-dasharray="3,3"/>`;
+  let targetLine='';
+  if(targetNW&&targetNW>minV&&targetNW<maxV){
+    const yT=ys(targetNW).toFixed(1);
+    targetLine=`<line x1="${PL}" y1="${yT}" x2="${W-PR}" y2="${yT}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,4"/><text x="${W-PR+4}" y="${yT}" dominant-baseline="middle" fill="#58a6ff" font-size="9">Target</text>`;
+  }
+  const legendY=PT+8;
+  const legend=`<circle cx="${PL+8}" cy="${legendY}" r="4" fill="#3fb950"/><text x="${PL+16}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Optimistic</text>
+  <line x1="${PL+82}" y1="${legendY}" x2="${PL+96}" y2="${legendY}" stroke="#58a6ff" stroke-width="2.5"/><text x="${PL+100}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Base</text>
+  <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+  ${grid}${yLbl}${xLbl}${todayLine}${targetLine}
+  <polygon points="${bandPts}" fill="rgba(88,166,255,0.07)"/>
+  ${line('pessimistic','rgba(248,81,73,0.7)','5,4')}
+  ${line('optimistic','rgba(63,185,80,0.7)','5,4')}
+  ${line('base','#58a6ff')}
+  <circle cx="${xs(0).toFixed(1)}" cy="${ys(currentNW).toFixed(1)}" r="5" fill="#58a6ff" stroke="#090c13" stroke-width="2"/>
+  ${legend}
+  </svg>`;
+}
+
+function renderProjection(d, history) {
+  const el=document.getElementById('projection'); if(!el) return;
+  const histDays=history.length;
+  const canAuto=histDays>=30;
+  const rates=canAuto?computeRates(history):null;
+
+  const BUCKET_LABELS={t1_index:'T1 Index funds',t2:'T2 Stocks',t3a_ideco:'T3(a) iDeCo',t4:'T4 Real estate equity',t0:'T0 Cash',t1_hysa:'T1 HYSA',t1_gold:'T1 Gold',t3a_insurance:'T3(a) Insurance',t3b:'T3(b) 529'};
+  const HAS_CONTRIB=['t1_index','t2','t3a_ideco'];
+
+  const currentFromHistory=(key)=>{
+    if(!history.length) return 0;
+    const l=history[history.length-1];
+    if(key==='t4') return (l.t4_land||0)+(l.t4_building||0)-(l.t4_mortgage||0);
+    const colMap={t1_index:'t1_index_value',t2:'t2_value',t3a_ideco:'t3a_ideco_value',t0:'t0_value',t1_hysa:'t1_hysa',t1_gold:'t1_gold',t3a_insurance:'t3a_insurance',t3b:'t3b_value'};
+    return l[colMap[key]]||0;
+  };
+
+  const warnHtml=histDays<30
+    ?`<div class="proj-warning red">Not enough data (${histDays} day${histDays!==1?'s':''} recorded) — enter rates manually to preview a projection, or wait until 30 days have been captured.</div>`
+    :histDays<365
+    ?`<div class="proj-warning yellow">Limited data (${histDays} days) — estimates may not reflect full annual contribution patterns.</div>`:'';
+
+  const manualCardsHtml=Object.entries(BUCKET_LABELS).map(([key,label])=>{
+    const r=rates&&rates[key];
+    const defContrib=r?Math.round(r.monthlyContrib):0;
+    const defRate=r?(r.annualBase*100).toFixed(1):'5.0';
+    return `<div class="manual-card">
+      <div class="manual-card-title">${label}</div>
+      ${HAS_CONTRIB.includes(key)?`<div class="manual-row"><label>¥/month</label><input id="mr_c_${key}" type="number" value="${defContrib}" step="10000"></div>`:''}
+      <div class="manual-row"><label>Return %</label><input id="mr_r_${key}" type="number" value="${defRate}" step="0.1"></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    ${warnHtml}
+    <div class="proj-inputs">
+      <div class="proj-group">
+        <span class="proj-label">Time horizon — <span id="pHL">10 years</span></span>
+        <input type="range" id="pHorizon" min="1" max="30" value="10">
+      </div>
+      <div class="proj-group">
+        <span class="proj-label">Contributions</span>
+        <select id="pContrib" class="proj-select">
+          <option value="auto">Historical pace</option>
+          <option value="manual">Manual input</option>
+          <option value="stopped">Stopped</option>
+        </select>
+      </div>
+      <div class="proj-group">
+        <span class="proj-label">NW target (¥)</span>
+        <input type="number" id="pTarget" class="proj-number" placeholder="e.g. 100000000" step="1000000">
+      </div>
+    </div>
+    <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
+    <div class="card" style="padding:14px 14px 10px"><div id="pChart"></div><div id="pAnnotation" style="margin-top:6px"></div></div>
+    <div class="card" style="padding:0;overflow-x:auto;margin-top:10px">
+      <table class="proj-table">
+        <thead><tr><th style="text-align:left">Bucket</th><th>Current</th><th>Projected</th><th>Capital added</th><th>Returns</th><th>Ann. rate</th></tr></thead>
+        <tbody id="pTbody"></tbody>
+        <tfoot><tr id="pTfoot"></tr></tfoot>
+      </table>
+    </div>
+    <div style="height:32px"></div>`;
+
+  function rebuild(){
+    const yrs=parseInt(document.getElementById('pHorizon').value)||10;
+    const mode=document.getElementById('pContrib').value;
+    const target=parseFloat((document.getElementById('pTarget').value||'0').replace(/[¥,]/g,''))||0;
+    const months=yrs*12;
+    document.getElementById('pHL').textContent=yrs+' year'+(yrs!==1?'s':'');
+    document.getElementById('pManual').style.display=mode==='manual'?'block':'none';
+
+    // Build rates to use
+    let pr={};
+    for(const key of Object.keys(BUCKET_LABELS)){
+      const r=rates&&rates[key];
+      const cv=r?r.currentValue:currentFromHistory(key);
+      let annualBase=r?r.annualBase:0.05, annualSigma=r?r.annualSigma:0, monthlyContrib=r?r.monthlyContrib:0;
+      if(mode==='manual'){
+        const rc=document.getElementById(`mr_c_${key}`), rr=document.getElementById(`mr_r_${key}`);
+        if(rr) annualBase=(parseFloat(rr.value)||0)/100;
+        if(rc) monthlyContrib=parseFloat(rc.value)||0;
+        annualSigma=0;
+      }
+      if(mode==='stopped') monthlyContrib=0;
+      pr[key]={annualBase,annualSigma,monthlyContrib,currentValue:cv};
+    }
+
+    if(!Object.values(pr).some(r=>r.currentValue>0)){
+      document.getElementById('pChart').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No data available yet.</p>';
+      return;
+    }
+
+    const projData=buildProjection(pr,months,mode);
+    const currentNW=projData[0].base;
+
+    // Annotations
+    let ann='';
+    if(target>0){
+      const hit=projData.find(p=>p.base>=target);
+      ann=hit?`<span style="font-size:12px;color:var(--green)">📈 Base reaches target in ${Math.floor(hit.month/12)}y ${hit.month%12}m</span>`
+             :`<span style="font-size:12px;color:var(--muted)">Base scenario does not reach target within ${yrs} years</span>`;
+    }
+    if(months>histDays*5) ann+=(ann?'&ensp;':'')+'<span style="font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</span>';
+    document.getElementById('pAnnotation').innerHTML=ann;
+
+    document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,target||null);
+
+    // Summary table
+    let totalCur=0,totalProj=0,totalCap=0,totalRet=0;
+    document.getElementById('pTbody').innerHTML=Object.entries(BUCKET_LABELS).map(([key,label])=>{
+      const r=pr[key]; if(!r||r.currentValue===0) return '';
+      const proj=projectBucket(r.currentValue,r.monthlyContrib,r.annualBase,months);
+      const cap=r.monthlyContrib*months, ret=proj-r.currentValue-cap;
+      totalCur+=r.currentValue; totalProj+=proj; totalCap+=cap; totalRet+=ret;
+      return `<tr><td>${label}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">+${fmt(cap)}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${(r.annualBase*100).toFixed(1)}%</td></tr>`;
+    }).join('');
+    document.getElementById('pTfoot').innerHTML=`<td>Total</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">+${fmt(totalCap)}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
+  }
+
+  ['pHorizon','pContrib','pTarget'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.addEventListener('input',rebuild); el.addEventListener('change',rebuild);
+  });
+  document.querySelectorAll('.manual-card input').forEach(el=>el.addEventListener('input',rebuild));
+  rebuild();
+}
 
 // Hardcoded targets/goals not present in clean data:
 const PASSIVE_INCOME_TARGET = 831264;
@@ -436,13 +753,23 @@ function render(d) {
 
   const html = `
     <div class="header">
-      <div class="header-title">Wealthtrack</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="header-title">Wealthtrack</div>
+        <div class="tabs">
+          <button class="tab active" id="tabDash">Dashboard</button>
+          <button class="tab" id="tabProj">Projection</button>
+        </div>
+      </div>
       <div class="header-meta">
         <span class="badge">USD/JPY ${d.exchangeRate.toFixed(2)}</span>
         <span class="badge">${dateStr}</span>
         <button class="btn" id="refreshBtn">↻ 更新</button>
       </div>
     </div>
+    <div id="dashboard-content"></div>
+    <div id="projection" style="display:none"></div>`;
+
+  const mainHtml = `
 
     <!-- Row 1: 6 summary metrics -->
     ${(()=>{
@@ -649,6 +976,23 @@ function render(d) {
   `;
 
   document.getElementById('dashboard').innerHTML = html;
+  document.getElementById('dashboard-content').innerHTML = mainHtml;
+
+  // Tab switching
+  document.getElementById('tabDash').addEventListener('click', () => {
+    document.getElementById('dashboard-content').style.display='block';
+    document.getElementById('projection').style.display='none';
+    document.getElementById('tabDash').classList.add('active');
+    document.getElementById('tabProj').classList.remove('active');
+  });
+  document.getElementById('tabProj').addEventListener('click', () => {
+    document.getElementById('dashboard-content').style.display='none';
+    document.getElementById('projection').style.display='block';
+    document.getElementById('tabDash').classList.remove('active');
+    document.getElementById('tabProj').classList.add('active');
+  });
+
+  renderProjection(d, _history);
 
   function bindHoldingsEvents() {
     // Sort
@@ -713,10 +1057,11 @@ async function loadAndRender() {
   loadEl.textContent = 'データ読み込み中...';
   dashEl.style.display = 'none';
   try {
-    const [cleanRes, pfRes] = await Promise.all([fetch(CLEAN_URL), fetch(PORTFOLIO_URL)]);
+    const [cleanRes, pfRes, histRes] = await Promise.all([fetch(CLEAN_URL), fetch(PORTFOLIO_URL), fetch(HISTORY_URL)]);
     if (!cleanRes.ok) throw new Error(`HTTP ${cleanRes.status}`);
-    const [cleanText, pfText] = await Promise.all([cleanRes.text(), pfRes.text()]);
+    const [cleanText, pfText, histText] = await Promise.all([cleanRes.text(), pfRes.text(), histRes.ok ? histRes.text() : Promise.resolve('')]);
     const data = extract(parseCSV(cleanText), parseCSV(pfText));
+    _history = histText ? parseHistory(parseCSV(histText)) : [];
     loadEl.style.display = 'none';
     dashEl.style.display = 'block';
     render(data);
