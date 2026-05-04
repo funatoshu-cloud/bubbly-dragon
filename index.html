@@ -285,7 +285,7 @@ function extract(rows, pfRows) {
   d.ltv       = { result: re[4]||'', actual: pct(re[4]), target: '<70%',  eq: `${mRnd(num(re[2])*10000)} ÷ ${mRnd(num(re[3])*10000)}` };
   d.nwCoverage= { result: nw[4]||'', actual: pct(nw[4]), target: '>50%',  eq: `${mRnd(num(nw[2]))} ÷ ${mRnd(num(nw[3]))}` };
   d.debtIncome= { result: di[4]||'', val: parseFloat((di[4]||'').replace('x','')||0), target: '<6x',    eq: `${mRnd(num(di[2]))} ÷ ${mRnd(num(di[3]))}` };
-  d.dscr      = { result: ds[4]||'', val: parseFloat((ds[4]||'').replace('x','')||0), target: '>2.0x',  eq: `${mRnd(num(ds[2]))} ÷ ${mRnd(num(ds[3]))}` };
+  d.dscr      = { result: ds[4]||'', val: parseFloat((ds[4]||'').replace('x','')||0), target: '<30%',   eq: `${mRnd(num(ds[2]))} ÷ ${mRnd(num(ds[3]))}` };
 
   // Holdings (rows 81–119)
   d.holdings = [];
@@ -559,7 +559,7 @@ function render(d) {
         if (metric === 'ltv')  return d.ltv.actual > 80       ? 'lev-red'    : d.ltv.actual > 70       ? 'lev-yellow' : 'lev-green';
         if (metric === 'nw')   return d.nwCoverage.actual < 35 ? 'lev-red'   : d.nwCoverage.actual < 50 ? 'lev-yellow' : 'lev-green';
         if (metric === 'di')   return d.debtIncome.val > 7     ? 'lev-red'   : d.debtIncome.val >= 5    ? 'lev-yellow' : 'lev-green';
-        if (metric === 'dscr') return d.dscr.val < 2           ? 'lev-red'   : d.dscr.val < 3           ? 'lev-yellow' : 'lev-green';
+        if (metric === 'dscr') return d.dscr.val >= 35          ? 'lev-red'   : d.dscr.val >= 30         ? 'lev-yellow' : 'lev-green';
       }
       function levCard(title, eq, actual, target, metric) {
         const cls = lc(metric);
@@ -578,14 +578,14 @@ function render(d) {
       }
       return `
       <div class="lev-header">
-        <h2 style="margin:20px 0 10px;border-left:3px solid var(--blue);padding-left:10px;font-size:15px;font-weight:600">レバレッジ健全性</h2>
+        <h2>レバレッジ健全性</h2>
         <span class="lev-income">本年度年収：${fmtM(d.annualIncome)}</span>
       </div>
       <div class="leverage-grid">
         ${levCard('LTV（自己持分）',     d.ltv.eq,        d.ltv.result,        d.ltv.target,        'ltv')}
         ${levCard('純資産カバー率',       d.nwCoverage.eq, d.nwCoverage.result, d.nwCoverage.target, 'nw')}
         ${levCard('総責務÷年収',         d.debtIncome.eq, d.debtIncome.result, d.debtIncome.target, 'di')}
-        ${levCard('DSCR（手取÷返済）',  d.dscr.eq,       d.dscr.result,       d.dscr.target,       'dscr')}
+        ${levCard('返済比率（額面ベース）', d.dscr.eq,      d.dscr.result,       d.dscr.target,       'dscr')}
       </div>`;
     })()}
 
