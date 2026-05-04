@@ -291,7 +291,7 @@ function computeRates(history) {
   const t4Med=arrMedian(t4Returns), t4Sd=arrStddev(t4Returns);
   const t4Filt=t4Returns.filter(r=>Math.abs(r-t4Med)<=3*t4Sd);
   const last=history[history.length-1];
-  rates.t4={ annualBase:arrMedian(t4Filt)*365, annualSigma:arrStddev(t4Filt)*Math.sqrt(365), monthlyContrib:0, currentValue:(last.t4_land||0)+(last.t4_building||0)-(last.t4_mortgage||0) };
+  rates.t4={ annualBase:arrMedian(t4Filt)*365, annualSigma:arrStddev(t4Filt)*Math.sqrt(365), monthlyContrib:0, currentValue:(last.t4_land||0)+(last.t4_building||0)-(last.t4_mortgage||0), _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt };
 
   // Monthly buckets: simple ΔV/V
   for (const [key,col] of [['t0','t0_value'],['t1_hysa','t1_hysa'],['t1_gold','t1_gold'],['t3a_insurance','t3a_insurance'],['t3b','t3b_value']]) {
@@ -309,14 +309,19 @@ function projectBucket(currentVal, monthlyContrib, annualRate, months) {
   return currentVal*g+monthlyContrib*(g-1)/r;
 }
 
-function buildProjection(rates, months, contribMode) {
+function buildProjection(rates, months, stopMonths) {
   const KEYS=['t1_index','t2','t3a_ideco','t4','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
   const result=[];
   for(let m=0;m<=months;m++){
     let base=0,opt=0,pess=0;
     for(const key of KEYS){
       const r=rates[key]; if(!r) continue;
-      const contrib=contribMode==='stopped'?0:r.monthlyContrib;
+      // Linear mortgage paydown for RE-excluded mode
+      if(r._isLinearPaydown){
+        const fv=Math.min(0, r.currentValue + m * r._monthlyPaydown);
+        base+=fv; opt+=fv; pess+=fv; continue;
+      }
+      const contrib = (m <= stopMonths) ? r.monthlyContrib : 0;
       base +=projectBucket(r.currentValue,contrib,r.annualBase,m);
       opt  +=projectBucket(r.currentValue,contrib,r.annualBase+r.annualSigma,m);
       pess +=projectBucket(r.currentValue,contrib,r.annualBase-r.annualSigma,m);
@@ -354,6 +359,8 @@ function buildChart(projData, currentNW, targetNW) {
     xLbl+=`<text x="${x}" y="${H-PB+16}" text-anchor="middle" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
     if(yr>0) grid+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
   }
+  let zeroLine='';
+  if(minV<0&&maxV>0){const y0=ys(0).toFixed(1);zeroLine=`<line x1="${PL}" y1="${y0}" x2="${W-PR}" y2="${y0}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/><text x="${PL-6}" y="${y0}" text-anchor="end" dominant-baseline="middle" fill="rgba(255,255,255,0.35)" font-size="10">0</text>`;}
   const todayLine=`<line x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.2)" stroke-dasharray="3,3"/>`;
   let targetLine='';
   if(targetNW&&targetNW>minV&&targetNW<maxV){
@@ -366,7 +373,7 @@ function buildChart(projData, currentNW, targetNW) {
   <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>`;
 
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
-  ${grid}${yLbl}${xLbl}${todayLine}${targetLine}
+  ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}
   <polygon points="${bandPts}" fill="rgba(88,166,255,0.07)"/>
   ${line('pessimistic','rgba(248,81,73,0.7)','5,4')}
   ${line('optimistic','rgba(63,185,80,0.7)','5,4')}
@@ -409,6 +416,8 @@ function renderProjection(d, history) {
     </div>`;
   }).join('');
 
+  const nowYM=(()=>{const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;})();
+
   el.innerHTML=`
     ${warnHtml}
     <div class="proj-inputs">
@@ -421,12 +430,21 @@ function renderProjection(d, history) {
         <select id="pContrib" class="proj-select">
           <option value="auto">Historical pace</option>
           <option value="manual">Manual input</option>
-          <option value="stopped">Stopped</option>
         </select>
+      </div>
+      <div class="proj-group" id="pStopGroup">
+        <span class="proj-label">Stop contributing from</span>
+        <input type="month" id="pStopDate" class="proj-number" value="${nowYM}">
       </div>
       <div class="proj-group">
         <span class="proj-label">NW target (¥)</span>
         <input type="number" id="pTarget" class="proj-number" placeholder="e.g. 100000000" step="1000000">
+      </div>
+      <div class="proj-group" style="justify-content:flex-end">
+        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--muted)">
+          <input type="checkbox" id="pExcludeRE" style="accent-color:var(--blue);cursor:pointer">
+          Exclude real estate (mortgage as liability)
+        </label>
       </div>
     </div>
     <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
@@ -440,13 +458,23 @@ function renderProjection(d, history) {
     </div>
     <div style="height:32px"></div>`;
 
+  function monthsFromNow(yyyyMM){
+    if(!yyyyMM) return Infinity;
+    const[y,m]=yyyyMM.split('-').map(Number), n=new Date();
+    return (y-n.getFullYear())*12+(m-1-n.getMonth());
+  }
+
   function rebuild(){
     const yrs=parseInt(document.getElementById('pHorizon').value)||10;
     const mode=document.getElementById('pContrib').value;
+    const stopDate=document.getElementById('pStopDate')?.value||'';
+    const stopMonths=Math.max(0, monthsFromNow(stopDate));
     const target=parseFloat((document.getElementById('pTarget').value||'0').replace(/[¥,]/g,''))||0;
+    const excludeRE=document.getElementById('pExcludeRE')?.checked||false;
     const months=yrs*12;
     document.getElementById('pHL').textContent=yrs+' year'+(yrs!==1?'s':'');
     document.getElementById('pManual').style.display=mode==='manual'?'block':'none';
+    if(document.getElementById('pStopGroup')) document.getElementById('pStopGroup').style.display=mode==='auto'?'flex':'none';
 
     // Build rates to use
     let pr={};
@@ -460,21 +488,34 @@ function renderProjection(d, history) {
         if(rc) monthlyContrib=parseFloat(rc.value)||0;
         annualSigma=0;
       }
-      if(mode==='stopped') monthlyContrib=0;
       pr[key]={annualBase,annualSigma,monthlyContrib,currentValue:cv};
     }
 
-    if(!Object.values(pr).some(r=>r.currentValue>0)){
+    // RE exclusion: replace T4 equity with mortgage-as-liability (linear paydown)
+    if(excludeRE){
+      const mortBal=(rates&&rates.t4&&rates.t4._mortgageBalance)||
+                    (history.length?history[history.length-1].t4_mortgage||0:0);
+      const monthlyPaydown=(rates&&rates.t4&&rates.t4._monthlyPaydown)||0;
+      pr.t4={annualBase:0,annualSigma:0,monthlyContrib:0,currentValue:-mortBal,_isLinearPaydown:true,_monthlyPaydown:monthlyPaydown};
+    }
+
+    if(!Object.values(pr).some(r=>r.currentValue!==0)){
       document.getElementById('pChart').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No data available yet.</p>';
       return;
     }
 
-    const projData=buildProjection(pr,months,mode);
+    const projData=buildProjection(pr,months,stopMonths);
     const currentNW=projData[0].base;
 
     // Annotations
     let ann='';
-    if(target>0){
+    if(excludeRE){
+      // Find when NFA crosses zero (net of mortgage)
+      const crossZero=projData.find(p=>p.base>=0);
+      ann=crossZero
+        ?`<span style="font-size:12px;color:var(--green)">純金融資産 net zero reached in ${Math.floor(crossZero.month/12)}y ${crossZero.month%12}m</span>`
+        :`<span style="font-size:12px;color:var(--muted)">純金融資産 net zero not reached within ${yrs} years</span>`;
+    } else if(target>0){
       const hit=projData.find(p=>p.base>=target);
       ann=hit?`<span style="font-size:12px;color:var(--green)">📈 Base reaches target in ${Math.floor(hit.month/12)}y ${hit.month%12}m</span>`
              :`<span style="font-size:12px;color:var(--muted)">Base scenario does not reach target within ${yrs} years</span>`;
@@ -482,22 +523,23 @@ function renderProjection(d, history) {
     if(months>histDays*5) ann+=(ann?'&ensp;':'')+'<span style="font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</span>';
     document.getElementById('pAnnotation').innerHTML=ann;
 
-    document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,target||null);
+    document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,(!excludeRE&&target)||null);
 
     // Summary table
     let totalCur=0,totalProj=0,totalCap=0,totalRet=0;
     document.getElementById('pTbody').innerHTML=Object.entries(BUCKET_LABELS).map(([key,label])=>{
       const r=pr[key]; if(!r||r.currentValue===0) return '';
-      const proj=projectBucket(r.currentValue,r.monthlyContrib,r.annualBase,months);
-      const cap=r.monthlyContrib*months, ret=proj-r.currentValue-cap;
+      const proj=r._isLinearPaydown?Math.min(0,r.currentValue+months*r._monthlyPaydown):projectBucket(r.currentValue,r.monthlyContrib,r.annualBase,months);
+      const cap=r._isLinearPaydown?0:r.monthlyContrib*Math.min(months,stopMonths), ret=proj-r.currentValue-cap;
       totalCur+=r.currentValue; totalProj+=proj; totalCap+=cap; totalRet+=ret;
-      return `<tr><td>${label}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">+${fmt(cap)}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${(r.annualBase*100).toFixed(1)}%</td></tr>`;
+      const rowLabel=excludeRE&&key==='t4'?'T4 Mortgage (liability)':label;
+      return `<tr><td>${rowLabel}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">${cap?'+'+fmt(cap):'—'}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${r._isLinearPaydown?'linear paydown':(r.annualBase*100).toFixed(1)+'%'}</td></tr>`;
     }).join('');
-    document.getElementById('pTfoot').innerHTML=`<td>Total</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">+${fmt(totalCap)}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
+    document.getElementById('pTfoot').innerHTML=`<td>Total (${excludeRE?'純金融資産':'NW'})</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
   }
 
-  ['pHorizon','pContrib','pTarget'].forEach(id=>{
-    const el=document.getElementById(id);
+  ['pHorizon','pContrib','pStopDate','pTarget','pExcludeRE'].forEach(id=>{
+    const el=document.getElementById(id); if(!el) return;
     el.addEventListener('input',rebuild); el.addEventListener('change',rebuild);
   });
   document.querySelectorAll('.manual-card input').forEach(el=>el.addEventListener('input',rebuild));
