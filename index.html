@@ -103,6 +103,28 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .warn { color: var(--yellow); }
 .bad { color: var(--red); }
 
+/* Waterfall chart */
+.wfall-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 16px 12px; margin-bottom:10px; position:relative; }
+.wfall-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; }
+.wfall-legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
+.wfall-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.wfall-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:8px 11px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+
+/* Mortgage simulator */
+.msim-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:10px; }
+.msim-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+.msim-stat { background:var(--surface2); border-radius:6px; padding:10px 12px; }
+.msim-stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
+.msim-stat-val { font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+.msim-slider-row { display:flex; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.msim-slider { flex:1; min-width:120px; accent-color:var(--blue); }
+.msim-slider-label { font-size:12px; color:var(--muted); white-space:nowrap; }
+.msim-slider-val { font-size:14px; font-weight:700; color:var(--blue); min-width:80px; text-align:right; }
+.msim-result { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px; }
+.msim-result-item { background:var(--surface2); border-radius:6px; padding:10px 12px; text-align:center; }
+.msim-result-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:5px; }
+.msim-result-val { font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; }
+
 /* Scorecard table */
 .sc-table { width: 100%; border-collapse: collapse; }
 .sc-table th { text-align: left; padding: 7px 14px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--border); }
@@ -212,6 +234,8 @@ input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
   .header { flex-direction: column; align-items: flex-start; }
   .lev-header { flex-direction: column; align-items: flex-start; gap: 2px; }
   .lev-actual { font-size: 20px; }
+  .msim-stats { grid-template-columns: repeat(2,1fr); }
+  .msim-result { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -467,6 +491,196 @@ function setupChartInteraction(projData) {
     [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
     tip.style.display='none';
   });
+}
+
+// ── Monthly Waterfall ─────────────────────────────────────────────────────────
+function buildWaterfallData(history) {
+  if (!history || history.length < 2) return [];
+  // Last entry per calendar month
+  const monthMap = new Map();
+  for (const row of history) {
+    const key = `${row.date.getFullYear()}-${String(row.date.getMonth()+1).padStart(2,'0')}`;
+    monthMap.set(key, row);
+  }
+  const months = [...monthMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,r])=>({k,r}));
+  if (months.length < 2) return [];
+  const finVal = r => (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
+  const costVal = r => (r.t1_index_cost||0)+(r.t2_cost||0)+(r.t3a_ideco_cost||0);
+  const reVal   = r => (r.t4_land||0)+(r.t4_building||0);
+  const result = [];
+  for (let i = 1; i < months.length; i++) {
+    const p = months[i-1].r, c = months[i].r;
+    const contrib        = costVal(c) - costVal(p);
+    const returns        = (finVal(c) - finVal(p)) - contrib;
+    const mortgagePaydown= -((c.t4_mortgage||0) - (p.t4_mortgage||0));
+    const reChange       = reVal(c) - reVal(p);
+    result.push({ month: months[i].k, contrib, returns, mortgagePaydown, reChange,
+                  total: contrib + returns + mortgagePaydown + reChange });
+  }
+  return result.slice(-12);
+}
+
+function renderWaterfallChart(history, container) {
+  const data = buildWaterfallData(history);
+  if (!data.length) { container.innerHTML = ''; return; }
+
+  const W=800,H=210,PL=68,PR=20,PT=14,PB=36;
+  const cW=W-PL-PR, cH=H-PT-PB, n=data.length;
+  const C = { contrib:'#58a6ff', retPos:'#3fb950', retNeg:'#f85149', mortgage:'#bc8cff', rePos:'#f0883e', reNeg:'#d29922' };
+
+  // Scale
+  const allPosMax = Math.max(0,...data.map(d=>[d.contrib,d.returns,d.mortgagePaydown,d.reChange].filter(v=>v>0).reduce((s,v)=>s+v,0)));
+  const allNegMin = Math.min(0,...data.map(d=>[d.contrib,d.returns,d.mortgagePaydown,d.reChange].filter(v=>v<0).reduce((s,v)=>s+v,0)));
+  const pad = Math.max(Math.abs(allPosMax),Math.abs(allNegMin))*0.12||1;
+  const dataMax=allPosMax+pad, dataMin=allNegMin-pad;
+  const xs = i => PL+(i+0.5)/n*cW;
+  const barW = Math.max(10, cW/n*0.55);
+  const ys = v => PT+(1-(v-dataMin)/(dataMax-dataMin))*cH;
+  const zero = ys(0);
+
+  // Grid & labels
+  let grid='',yLbl='';
+  [-2,-1,0,1,2].forEach(t=>{
+    const v=(t/2)*(t>=0?dataMax:-dataMin), y=ys(v).toFixed(1);
+    grid+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.05)"/>`;
+    if(Math.abs(v)>50000||v===0) yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${v===0?'0':(v/1000000).toFixed(1)+'M'}</text>`;
+  });
+  const zeroLine=`<line x1="${PL}" y1="${zero.toFixed(1)}" x2="${W-PR}" y2="${zero.toFixed(1)}" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>`;
+
+  // Bars
+  let bars='', xLbl='';
+  data.forEach((d,i)=>{
+    const cx=xs(i), x=(cx-barW/2).toFixed(1), bw=barW.toFixed(1);
+    const drivers=[
+      {val:d.contrib,        posC:C.contrib,  negC:C.contrib},
+      {val:d.returns,        posC:C.retPos,   negC:C.retNeg},
+      {val:d.mortgagePaydown,posC:C.mortgage, negC:C.mortgage},
+      {val:d.reChange,       posC:C.rePos,    negC:C.reNeg},
+    ];
+    let posBase=0, negBase=0;
+    drivers.forEach(({val,posC,negC})=>{
+      if(val>0){ const y1=ys(posBase+val),y2=ys(posBase); bars+=`<rect x="${x}" y="${y1.toFixed(1)}" width="${bw}" height="${(y2-y1).toFixed(1)}" fill="${posC}" rx="2"/>`; posBase+=val; }
+      else if(val<0){ const y1=ys(negBase),y2=ys(negBase+val); bars+=`<rect x="${x}" y="${y1.toFixed(1)}" width="${bw}" height="${(y2-y1).toFixed(1)}" fill="${negC}" rx="2" opacity="0.8"/>`; negBase+=val; }
+    });
+    const [yr,mo]=d.month.split('-');
+    xLbl+=`<text x="${cx.toFixed(1)}" y="${H-PB+16}" text-anchor="middle" fill="#6b7888" font-size="10">${parseInt(mo)}月${i===0||mo==='01'?` '${yr.slice(2)}`:''}${mo==='01'?'':''}</text>`;
+  });
+
+  const overlay=`<rect id="wfOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
+  const hair=`<line id="wfHair" x1="0" y1="${PT}" x2="0" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
+
+  container.innerHTML=`<div class="wfall-card">
+    <h2 style="margin-top:0">月次 NW 変動内訳</h2>
+    <svg id="wfSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+      ${grid}${yLbl}${xLbl}${zeroLine}${bars}${hair}${overlay}
+    </svg>
+    <div class="wfall-legend">
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.contrib}"></div>資金追加</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retPos}"></div>運用益</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retNeg}"></div>運用損</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.mortgage}"></div>ローン返済</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.rePos}"></div>不動産変動</div>
+    </div>
+    <div id="wfTip" class="wfall-tip"></div>
+  </div>`;
+
+  container.style.position='relative';
+  const svgEl=document.getElementById('wfSvg'), ovEl=document.getElementById('wfOverlay');
+  const hlEl=document.getElementById('wfHair'), tipEl=document.getElementById('wfTip');
+  if(!svgEl||!ovEl) return;
+
+  ovEl.addEventListener('mousemove',e=>{
+    const rect=svgEl.getBoundingClientRect(), scaleX=rect.width/W;
+    const mxSvg=(e.clientX-rect.left)/scaleX;
+    const i=Math.min(n-1,Math.max(0,Math.floor((mxSvg-PL)/cW*n)));
+    const pt=data[i], cx=xs(i).toFixed(1);
+    hlEl.setAttribute('x1',cx); hlEl.setAttribute('x2',cx); hlEl.setAttribute('visibility','visible');
+    const [yr,mo]=pt.month.split('-');
+    const fd=v=>(v>=0?'+':'')+fmt(v);
+    const tipX=e.clientX-rect.left, tipY=e.clientY-rect.top, flip=tipX>rect.width*0.6;
+    tipEl.style.left=flip?'auto':(tipX+12)+'px'; tipEl.style.right=flip?(rect.width-tipX+12)+'px':'auto';
+    tipEl.style.top=Math.max(0,tipY-90)+'px';
+    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${yr}年${parseInt(mo)}月　合計 <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
+      `<div style="color:${C.contrib};margin-bottom:2px">資金追加　　${fd(pt.contrib)}</div>`+
+      `<div style="color:${pt.returns>=0?C.retPos:C.retNeg};margin-bottom:2px">運用損益　　${fd(pt.returns)}</div>`+
+      `<div style="color:${C.mortgage};margin-bottom:2px">ローン返済　${fd(pt.mortgagePaydown)}</div>`+
+      (Math.abs(pt.reChange)>1000?`<div style="color:${C.rePos}">不動産変動　${fd(pt.reChange)}</div>`:'');
+    tipEl.style.display='block';
+  });
+  ovEl.addEventListener('mouseleave',()=>{ hlEl.setAttribute('visibility','hidden'); tipEl.style.display='none'; });
+}
+
+// ── Mortgage Simulator ────────────────────────────────────────────────────────
+function computeAmortization(balance, monthlyRate, payment, extra=0) {
+  const arr=[balance]; let bal=balance;
+  while(bal>0.01 && arr.length<700){ const interest=bal*monthlyRate; const principal=Math.min(payment+extra-interest,bal); if(principal<=0) break; bal=Math.max(0,bal-principal); arr.push(bal); }
+  return arr;
+}
+
+function renderMortgageSimulator(d, container) {
+  const balance=d.mortgage;
+  const mr=MORTGAGE_RATE/12, n=MORTGAGE_TERM_YEARS*12;
+  const factor=Math.pow(1+mr,n);
+  const pmt=balance*mr*factor/(factor-1);
+  const baseArr=computeAmortization(balance,mr,pmt,0);
+  const baseMonths=baseArr.length-1;
+  const baseTotalInterest=pmt*baseMonths-balance;
+
+  function ym(months){ const d=new Date(); d.setMonth(d.getMonth()+months); return `${d.getFullYear()}年${d.getMonth()+1}月`; }
+
+  function drawSim(extra){
+    const accel=computeAmortization(balance,mr,pmt,extra);
+    const accelMonths=accel.length-1;
+    const accelInterest=(pmt+extra)*accelMonths-balance;
+    const savedM=baseMonths-accelMonths, savedI=baseTotalInterest-accelInterest;
+
+    document.getElementById('msimPayoff').textContent=ym(accelMonths);
+    const smEl=document.getElementById('msimSavedM'), siEl=document.getElementById('msimSavedI');
+    if(savedM>0){ smEl.textContent=`${Math.floor(savedM/12)}年${savedM%12}ヶ月`; smEl.style.color='var(--green)'; siEl.textContent=fmt(Math.round(savedI)); siEl.style.color='var(--green)'; }
+    else { smEl.textContent='—'; smEl.style.color='var(--muted)'; siEl.textContent='—'; siEl.style.color='var(--muted)'; }
+
+    // Chart
+    const W=800,H=160,PL=68,PR=20,PT=10,PB=28, cW=W-PL-PR,cH=H-PT-PB;
+    const maxM=baseArr.length;
+    const xs=i=>PL+(i/(maxM-1))*cW, ys=v=>PT+(1-v/balance)*cH;
+    const bp=baseArr.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
+    const ap=accel.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
+    let grid='',xLbl='',yLbl='';
+    for(let yr=0;yr<=MORTGAGE_TERM_YEARS;yr+=5){ const x=xs(yr*12).toFixed(1); grid+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`; xLbl+=`<text x="${x}" y="${H-PB+14}" text-anchor="middle" fill="#6b7888" font-size="10">${yr}年</text>`; }
+    for(let i=0;i<=3;i++){ const v=balance*i/3, y=ys(v).toFixed(1); grid+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.04)"/>`; yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${(v/1e6).toFixed(0)}M</text>`; }
+    document.getElementById('msimChart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${grid}${yLbl}${xLbl}
+      <polyline points="${bp}" fill="none" stroke="rgba(248,81,73,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
+      <polyline points="${ap}" fill="none" stroke="${extra>0?'#3fb950':'rgba(248,81,73,0.6)'}" stroke-width="2.5"/>
+      <text x="${PL+6}" y="${PT+11}" fill="rgba(248,81,73,0.5)" font-size="9">元のペース</text>
+      ${extra>0?`<text x="${xs(accelMonths).toFixed(1)}" y="${ys(0)+14}" fill="#3fb950" font-size="9" text-anchor="middle">完済</text>`:''}
+    </svg>`;
+  }
+
+  container.innerHTML=`<div class="msim-card">
+    <h2 style="margin-top:0">住宅ローンシミュレーター</h2>
+    <div class="msim-stats">
+      <div class="msim-stat"><div class="msim-stat-label">残高</div><div class="msim-stat-val">${fmt(balance)}</div></div>
+      <div class="msim-stat"><div class="msim-stat-label">月額返済</div><div class="msim-stat-val">${fmt(Math.round(pmt))}</div></div>
+      <div class="msim-stat"><div class="msim-stat-label">残り期間</div><div class="msim-stat-val">${Math.floor(baseMonths/12)}年${baseMonths%12}ヶ月</div></div>
+      <div class="msim-stat"><div class="msim-stat-label">残り利息</div><div class="msim-stat-val loss">${fmt(Math.round(baseTotalInterest))}</div></div>
+    </div>
+    <div class="msim-slider-row">
+      <span class="msim-slider-label">毎月の追加返済</span>
+      <input type="range" id="msimSlider" class="msim-slider" min="0" max="500000" step="10000" value="0">
+      <span id="msimSliderVal" class="msim-slider-val">¥0</span>
+    </div>
+    <div class="msim-result">
+      <div class="msim-result-item"><div class="msim-result-label">期間短縮</div><div id="msimSavedM" class="msim-result-val" style="color:var(--muted)">—</div></div>
+      <div class="msim-result-item"><div class="msim-result-label">利息節約</div><div id="msimSavedI" class="msim-result-val" style="color:var(--muted)">—</div></div>
+      <div class="msim-result-item"><div class="msim-result-label">完済予定</div><div id="msimPayoff" class="msim-result-val" style="color:var(--text);font-size:13px">${ym(baseMonths)}</div></div>
+    </div>
+    <div id="msimChart"></div>
+    <div style="margin-top:8px;font-size:10px;color:var(--muted)">金利 ${(MORTGAGE_RATE*100).toFixed(2)}% ／ 元利金等払い ／ 現在残高ベースで計算</div>
+  </div>`;
+
+  drawSim(0);
+  const slider=document.getElementById('msimSlider'), valEl=document.getElementById('msimSliderVal');
+  slider.addEventListener('input',()=>{ valEl.textContent='¥'+parseInt(slider.value).toLocaleString('ja-JP'); drawSim(parseInt(slider.value)); });
 }
 
 function buildHistoryChart(history, period) {
@@ -830,6 +1044,8 @@ function renderProjection(d, history) {
 // Hardcoded targets/goals not present in clean data:
 const PASSIVE_INCOME_TARGET = 831264;
 const TIER_GOAL = 60000000; // Stretch goal
+const MORTGAGE_RATE = 0.0093;        // 0.93% annual
+const MORTGAGE_TERM_YEARS = 40;
 
 // Scorecard targets [name, target-string, pass-fn(value, raw)]
 const SCORECARD_TARGETS = [
@@ -1151,6 +1367,9 @@ function render(d) {
       <!-- History chart -->
       <div id="historyChartContainer"></div>
 
+      <!-- Monthly waterfall -->
+      <div id="waterfallContainer"></div>
+
       <!-- Row 2: equation -->
       <div class="eq-row">
         <div class="eq-card">
@@ -1252,6 +1471,9 @@ function render(d) {
       </div>`;
     })()}
 
+    <!-- Mortgage simulator -->
+    <div id="mortgageSimContainer"></div>
+
     <!-- Scorecard -->
     <h2>スコアカード</h2>
     ${(()=>{
@@ -1314,6 +1536,8 @@ function render(d) {
   document.getElementById('dashboard').innerHTML = html;
   document.getElementById('dashboard-content').innerHTML = mainHtml;
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
+  renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
+  renderMortgageSimulator(d, document.getElementById('mortgageSimContainer'));
 
   // Tab switching
   document.getElementById('tabDash').addEventListener('click', () => {
