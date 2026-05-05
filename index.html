@@ -111,7 +111,7 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .wfall-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:8px 11px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
 
 /* Mortgage simulator */
-.msim-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:10px; }
+.msim-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
 .msim-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
 .msim-stat { background:var(--surface2); border-radius:6px; padding:10px 12px; }
 .msim-stat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:4px; }
@@ -656,29 +656,45 @@ function renderMortgageSimulator(d, container) {
     </svg>`;
   }
 
-  container.innerHTML=`<div class="msim-card">
-    <h2 style="margin-top:0">住宅ローンシミュレーター</h2>
-    <div class="msim-stats">
-      <div class="msim-stat"><div class="msim-stat-label">残高</div><div class="msim-stat-val">${fmt(balance)}</div></div>
-      <div class="msim-stat"><div class="msim-stat-label">月額返済</div><div class="msim-stat-val">${fmt(Math.round(pmt))}</div></div>
-      <div class="msim-stat"><div class="msim-stat-label">残り期間</div><div class="msim-stat-val">${Math.floor(baseMonths/12)}年${baseMonths%12}ヶ月</div></div>
-      <div class="msim-stat"><div class="msim-stat-label">残り利息</div><div class="msim-stat-val loss">${fmt(Math.round(baseTotalInterest))}</div></div>
-    </div>
-    <div class="msim-slider-row">
-      <span class="msim-slider-label">毎月の追加返済</span>
-      <input type="range" id="msimSlider" class="msim-slider" min="0" max="500000" step="10000" value="0">
-      <span id="msimSliderVal" class="msim-slider-val">¥0</span>
-    </div>
-    <div class="msim-result">
-      <div class="msim-result-item"><div class="msim-result-label">期間短縮</div><div id="msimSavedM" class="msim-result-val" style="color:var(--muted)">—</div></div>
-      <div class="msim-result-item"><div class="msim-result-label">利息節約</div><div id="msimSavedI" class="msim-result-val" style="color:var(--muted)">—</div></div>
-      <div class="msim-result-item"><div class="msim-result-label">完済予定</div><div id="msimPayoff" class="msim-result-val" style="color:var(--text);font-size:13px">${ym(baseMonths)}</div></div>
-    </div>
-    <div id="msimChart"></div>
-    <div style="margin-top:8px;font-size:10px;color:var(--muted)">金利 ${(MORTGAGE_RATE*100).toFixed(2)}% ／ 元利金等払い ／ 現在残高ベースで計算</div>
-  </div>`;
+  container.innerHTML=`
+    <h2 id="msimToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+      住宅ローンシミュレーター
+      <span id="msimChevron" style="font-size:9px;color:var(--muted);transition:transform .2s;display:inline-block">▶</span>
+    </h2>
+    <div id="msimBody" style="display:none">
+      <div class="msim-card">
+        <div class="msim-stats">
+          <div class="msim-stat"><div class="msim-stat-label">残高</div><div class="msim-stat-val">${fmt(balance)}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">月額返済</div><div class="msim-stat-val">${fmt(Math.round(pmt))}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">残り期間</div><div class="msim-stat-val">${Math.floor(baseMonths/12)}年${baseMonths%12}ヶ月</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">残り利息</div><div class="msim-stat-val loss">${fmt(Math.round(baseTotalInterest))}</div></div>
+        </div>
+        <div class="msim-slider-row">
+          <span class="msim-slider-label">毎月の追加返済</span>
+          <input type="range" id="msimSlider" class="msim-slider" min="0" max="500000" step="10000" value="0">
+          <span id="msimSliderVal" class="msim-slider-val">¥0</span>
+        </div>
+        <div class="msim-result">
+          <div class="msim-result-item"><div class="msim-result-label">期間短縮</div><div id="msimSavedM" class="msim-result-val" style="color:var(--muted)">—</div></div>
+          <div class="msim-result-item"><div class="msim-result-label">利息節約</div><div id="msimSavedI" class="msim-result-val" style="color:var(--muted)">—</div></div>
+          <div class="msim-result-item"><div class="msim-result-label">完済予定</div><div id="msimPayoff" class="msim-result-val" style="color:var(--text);font-size:13px">${ym(baseMonths)}</div></div>
+        </div>
+        <div id="msimChart"></div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted)">金利 ${(MORTGAGE_RATE*100).toFixed(2)}% ／ 元利金等払い ／ 現在残高ベースで計算</div>
+      </div>
+    </div>`;
 
-  drawSim(0);
+  // Collapsible toggle
+  let msimOpen = false;
+  document.getElementById('msimToggle').addEventListener('click', () => {
+    msimOpen = !msimOpen;
+    const body = document.getElementById('msimBody');
+    const chevron = document.getElementById('msimChevron');
+    body.style.display = msimOpen ? 'block' : 'none';
+    chevron.style.transform = msimOpen ? 'rotate(90deg)' : 'rotate(0deg)';
+    if (msimOpen) { drawSim(0); }
+  });
+
   const slider=document.getElementById('msimSlider'), valEl=document.getElementById('msimSliderVal');
   slider.addEventListener('input',()=>{ valEl.textContent='¥'+parseInt(slider.value).toLocaleString('ja-JP'); drawSim(parseInt(slider.value)); });
 }
