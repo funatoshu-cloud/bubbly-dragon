@@ -376,7 +376,7 @@ function buildProjection(rates, months, stopMonths) {
   return result;
 }
 
-function buildChart(projData, currentNW, targetNW) {
+function buildChart(projData, currentNW, targetNW, coastNW) {
   const W=800,H=260,PL=72,PR=20,PT=20,PB=40;
   const cW=W-PL-PR, cH=H-PT-PB;
   const months=projData[projData.length-1].month;
@@ -412,10 +412,21 @@ function buildChart(projData, currentNW, targetNW) {
     const yT=ys(targetNW).toFixed(1);
     targetLine=`<line x1="${PL}" y1="${yT}" x2="${W-PR}" y2="${yT}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,4"/><text x="${W-PR+4}" y="${yT}" dominant-baseline="middle" fill="#58a6ff" font-size="9">Target</text>`;
   }
+  // Coast FIRE curve: NW needed at each month to coast to FIRE without contributions
+  let coastLine='';
+  if(coastNW&&coastNW.length&&coastNW[0]>minV){
+    const coastPts=coastNW.map((v,m)=>v>=minV&&v<=maxV*1.1?`${xs(m).toFixed(1)},${ys(Math.min(v,maxV)).toFixed(1)}`:null).filter(Boolean).join(' ');
+    if(coastPts) coastLine=`<polyline points="${coastPts}" fill="none" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="6,3"/>`;
+    // Label at end
+    const lastVisible=coastNW.reduce((acc,v,m)=>v>=minV&&v<=maxV*1.1?m:acc,-1);
+    if(lastVisible>0) coastLine+=`<text x="${xs(lastVisible).toFixed(1)}" y="${ys(coastNW[lastVisible]).toFixed(1)-6}" text-anchor="middle" fill="#f0883e" font-size="9">Coast FIRE</text>`;
+  }
   const legendY=PT+8;
   const legend=`<circle cx="${PL+8}" cy="${legendY}" r="4" fill="#3fb950"/><text x="${PL+16}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Optimistic</text>
   <line x1="${PL+82}" y1="${legendY}" x2="${PL+96}" y2="${legendY}" stroke="#58a6ff" stroke-width="2.5"/><text x="${PL+100}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Base</text>
-  <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>`;
+  <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>
+  ${coastNW&&coastNW.length?`<line x1="${PL+192}" y1="${legendY}" x2="${PL+206}" y2="${legendY}" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/><text x="${PL+210}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Coast FIRE</text>`:''}
+  `;
 
   const hairline=`<line id="chartHairline" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2" pointer-events="none" visibility="hidden"/>`;
   const dots=`<circle id="chartDotOpt" r="4" fill="rgba(63,185,80,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
@@ -424,7 +435,7 @@ function buildChart(projData, currentNW, targetNW) {
   const overlay=`<rect id="chartOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
 
   return `<svg id="projSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
-  ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}
+  ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}${coastLine}
   <polygon points="${bandPts}" fill="rgba(88,166,255,0.07)"/>
   ${line('pessimistic','rgba(248,81,73,0.7)','5,4')}
   ${line('optimistic','rgba(63,185,80,0.7)','5,4')}
@@ -505,7 +516,10 @@ function setupChartInteraction(projData) {
 
 // ── FIRE Progress Bar ─────────────────────────────────────────────────────────
 function renderFireBar(d, container) {
-  if (!d.fireNumber || d.fireNumber <= 0) { container.innerHTML=''; return; }
+  if (!d.fireNumber || d.fireNumber <= 0) {
+    container.innerHTML=`<h2>FIRE 達成度</h2><div class="fire-card" style="color:var(--muted);font-size:12px">FIRE目標が未設定です（data clean シート AA22 に目標純金融資産額を入力してください）</div>`;
+    return;
+  }
 
   const nfa    = d.netFinancialAssets;
   const target = d.fireNumber;
@@ -1073,7 +1087,32 @@ function renderProjection(d, history) {
     if(months>histDays*5) ann+=(ann?'&ensp;':'')+'<span style="font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</span>';
     document.getElementById('pAnnotation').innerHTML=ann;
 
-    document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,(!excludeRE&&target)||null);
+    // Coast FIRE curve: NW needed at month m to reach fireNumber by retirement without contributions
+    let coastCurve = null;
+    if(d.fireNumber > 0 && d.retirementAge > 0 && d.currentAge > 0 && !excludeRE) {
+      const yearsToRetire = d.retirementAge - d.currentAge;
+      const totalRetireMonths = yearsToRetire * 12;
+      // Use base annual return across all buckets (weighted by current value)
+      const totalCV = Object.values(pr).reduce((s,r)=>s+Math.max(0,r.currentValue),0);
+      const weightedRate = totalCV > 0
+        ? Object.values(pr).reduce((s,r)=>s + Math.max(0,r.currentValue)/totalCV * r.annualBase, 0)
+        : 0.05;
+      const mr = weightedRate / 12;
+      // At each projection month m: coast NW = fireNumber / (1+mr)^(remainingMonths-m)
+      coastCurve = projData.map(p => {
+        const remaining = totalRetireMonths - p.month;
+        if (remaining <= 0) return d.fireNumber;
+        return mr > 0 ? d.fireNumber / Math.pow(1 + mr, remaining) : d.fireNumber;
+      });
+      // Annotate when base line crosses coast FIRE curve
+      const coastCross = projData.find((p, i) => coastCurve[i] !== undefined && p.base >= coastCurve[i]);
+      if (coastCross) {
+        const ci = projData.indexOf(coastCross);
+        ann += (ann?'&ensp;':'') + `<span style="font-size:12px;color:#f0883e">🏖 Coast FIRE in ${Math.floor(coastCross.month/12)}y ${coastCross.month%12}m — contributions optional from then</span>`;
+      }
+    }
+
+    document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,(!excludeRE&&target)||null,coastCurve);
     setupChartInteraction(projData);
 
     // Summary table
@@ -1202,9 +1241,10 @@ function extract(rows, pfRows) {
   d.nisa2026  = { name: nisaRow[10] || '2026年枠',    pctStr: nisaRow[11] || '', used: num(nisaRow[12]),   limit: num(nisaRow[13]) };
   d.nisaLife  = { name: lifetimeRow[10] || '生涯投資枠', pctStr: lifetimeRow[11] || '', used: num(lifetimeRow[12]), limit: num(lifetimeRow[13]) };
 
-  // FIRE & retirement (AA21=rows[20][26], AA22=rows[21][26])
+  // FIRE & retirement (AA21=rows[20][26], AA22=rows[21][26], AA23=rows[22][26])
   d.retirementAge = num((rows[20]||[])[26]);
   d.fireNumber    = num((rows[21]||[])[26]);  // NFA target (excl. real estate)
+  d.currentAge    = num((rows[22]||[])[26]);
 
   // Real estate (rows 39-42)
   const re = rows[39] || [], nw = rows[40] || [], di = rows[41] || [], ds = rows[42] || [];
