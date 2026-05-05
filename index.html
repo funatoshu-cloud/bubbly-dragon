@@ -372,7 +372,13 @@ function buildChart(projData, currentNW, targetNW) {
   <line x1="${PL+82}" y1="${legendY}" x2="${PL+96}" y2="${legendY}" stroke="#58a6ff" stroke-width="2.5"/><text x="${PL+100}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Base</text>
   <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>`;
 
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+  const hairline=`<line id="chartHairline" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2" pointer-events="none" visibility="hidden"/>`;
+  const dots=`<circle id="chartDotOpt" r="4" fill="rgba(63,185,80,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
+  <circle id="chartDotBase" r="4" fill="#58a6ff" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
+  <circle id="chartDotPess" r="4" fill="rgba(248,81,73,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>`;
+  const overlay=`<rect id="chartOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
+
+  return `<svg id="projSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
   ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}
   <polygon points="${bandPts}" fill="rgba(88,166,255,0.07)"/>
   ${line('pessimistic','rgba(248,81,73,0.7)','5,4')}
@@ -380,7 +386,76 @@ function buildChart(projData, currentNW, targetNW) {
   ${line('base','#58a6ff')}
   <circle cx="${xs(0).toFixed(1)}" cy="${ys(currentNW).toFixed(1)}" r="5" fill="#58a6ff" stroke="#090c13" stroke-width="2"/>
   ${legend}
+  ${hairline}${dots}${overlay}
   </svg>`;
+}
+
+function setupChartInteraction(projData) {
+  const W=800,H=260,PL=72,PR=20,PT=20,PB=40;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const maxM=projData[projData.length-1].month;
+  const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
+  const minV=Math.min(...allV)*0.97, maxV=Math.max(...allV)*1.03;
+  const xs=m=>PL+(m/maxM)*cW;
+  const ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+
+  const svg=document.getElementById('projSvg');
+  const ov=document.getElementById('chartOverlay');
+  const hl=document.getElementById('chartHairline');
+  const dO=document.getElementById('chartDotOpt');
+  const dB=document.getElementById('chartDotBase');
+  const dP=document.getElementById('chartDotPess');
+  const pChart=document.getElementById('pChart');
+  if(!svg||!ov||!pChart) return;
+
+  pChart.style.position='relative';
+  let tip=document.getElementById('chartTip');
+  if(tip) tip.remove();
+  tip=document.createElement('div');
+  tip.id='chartTip';
+  tip.style.cssText='display:none;position:absolute;background:#161e2c;border:1px solid rgba(255,255,255,0.12);border-radius:7px;padding:9px 12px;font-size:12px;color:#dde4ee;pointer-events:none;white-space:nowrap;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,0.5)';
+  pChart.appendChild(tip);
+
+  const lookup=new Map(projData.map(p=>[p.month,p]));
+  const now=new Date();
+  const MONTHS_JP=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+  function monthLabel(m){
+    const d=new Date(now.getFullYear(),now.getMonth()+m,1);
+    return `${d.getFullYear()}年 ${MONTHS_JP[d.getMonth()]}`;
+  }
+
+  ov.addEventListener('mousemove', e=>{
+    const rect=svg.getBoundingClientRect();
+    const scaleX=rect.width/W, scaleY=rect.height/H;
+    const mxSvg=(e.clientX-rect.left)/scaleX;
+    const frac=Math.max(0,Math.min(1,(mxSvg-PL)/cW));
+    const m=Math.round(frac*maxM);
+    const pt=lookup.get(m)||projData[projData.length-1];
+    const hx=xs(pt.month).toFixed(1);
+
+    hl.setAttribute('x1',hx); hl.setAttribute('x2',hx); hl.setAttribute('visibility','visible');
+    [[dO,'optimistic'],[dB,'base'],[dP,'pessimistic']].forEach(([el,key])=>{
+      el.setAttribute('cx',hx); el.setAttribute('cy',ys(pt[key]).toFixed(1)); el.setAttribute('visibility','visible');
+    });
+
+    const tipX=e.clientX-rect.left, tipY=e.clientY-rect.top;
+    const flipLeft=tipX>rect.width*0.62;
+    tip.style.left=flipLeft?'auto':(tipX+14)+'px';
+    tip.style.right=flipLeft?(rect.width-tipX+14)+'px':'auto';
+    tip.style.top=Math.max(0,tipY-50)+'px';
+    tip.innerHTML=`<div style="font-size:11px;font-weight:700;color:#6b7888;margin-bottom:6px;letter-spacing:.04em">${monthLabel(pt.month)}</div>`+
+      `<div style="color:rgba(63,185,80,0.9);margin-bottom:2px">▲ ${fmt(pt.optimistic)}</div>`+
+      `<div style="color:#58a6ff;margin-bottom:2px">— ${fmt(pt.base)}</div>`+
+      `<div style="color:rgba(248,81,73,0.85)">▼ ${fmt(pt.pessimistic)}</div>`;
+    tip.style.display='block';
+  });
+
+  ov.addEventListener('mouseleave',()=>{
+    hl.setAttribute('visibility','hidden');
+    [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
+    tip.style.display='none';
+  });
 }
 
 function renderProjection(d, history) {
@@ -526,6 +601,7 @@ function renderProjection(d, history) {
     document.getElementById('pAnnotation').innerHTML=ann;
 
     document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,(!excludeRE&&target)||null);
+    setupChartInteraction(projData);
 
     // Summary table
     let totalCur=0,totalProj=0,totalCap=0,totalRet=0;
