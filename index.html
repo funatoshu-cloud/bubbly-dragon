@@ -77,18 +77,17 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .lev-header h2 { margin-bottom: 0; }
 .lev-income { font-size: 11px; color: var(--muted); }
 .leverage-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
-.lev-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; }
-.lev-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 6px; }
-.lev-actual { font-size: 24px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
-.lev-sub { font-size: 11px; color: var(--muted); margin-bottom: 12px; flex: 1; }
-.lev-bar-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: auto; }
-.lev-bar-fill { height: 3px; border-radius: 2px; }
+.lev-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+.lev-title { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.lev-eq { font-size: 11px; color: var(--muted); margin-bottom: 10px; }
+.lev-body { display: flex; align-items: flex-end; justify-content: space-between; }
+.lev-actual { font-size: 20px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.lev-target-col { text-align: right; }
+.lev-target-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 2px; }
+.lev-target-val { font-size: 14px; font-weight: 700; line-height: 1; }
 .lev-green { color: var(--green); }
 .lev-yellow { color: var(--yellow); }
 .lev-red { color: var(--red); }
-.lev-bar-green { background: var(--green); }
-.lev-bar-yellow { background: var(--yellow); }
-.lev-bar-red { background: var(--red); }
 .ok { color: var(--green); }
 .warn { color: var(--yellow); }
 .bad { color: var(--red); }
@@ -962,13 +961,17 @@ function render(d) {
       }
       function levCard(title, eq, actual, target, metric) {
         const cls = lc(metric);
-        const barCls = cls.replace('lev-','lev-bar-');
         return `
           <div class="lev-card">
             <div class="lev-title">${title}</div>
-            <div class="lev-actual ${cls}">${actual}</div>
-            <div class="lev-sub">${eq} &ensp;目標 ${target}</div>
-            <div class="lev-bar-track"><div class="lev-bar-fill ${barCls}" style="width:60%"></div></div>
+            <div class="lev-eq">${eq}</div>
+            <div class="lev-body">
+              <div class="lev-actual ${cls}">${actual}</div>
+              <div class="lev-target-col">
+                <div class="lev-target-label">目標</div>
+                <div class="lev-target-val ${cls}">${target}</div>
+              </div>
+            </div>
           </div>`;
       }
       return `
