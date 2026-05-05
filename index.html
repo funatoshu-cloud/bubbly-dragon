@@ -103,6 +103,16 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .warn { color: var(--yellow); }
 .bad { color: var(--red); }
 
+/* FIRE progress bar */
+.fire-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:10px; }
+.fire-header { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+.fire-pct { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }
+.fire-meta { font-size:11px; color:var(--muted); }
+.fire-track { height:8px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:8px; }
+.fire-fill { height:100%; border-radius:4px; transition:width .4s ease; }
+.fire-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
+.fire-milestone { position:absolute; top:0; height:100%; border-left:2px dashed rgba(255,255,255,0.2); }
+
 /* Waterfall chart */
 .wfall-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 16px 12px; margin-bottom:10px; position:relative; }
 .wfall-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; }
@@ -491,6 +501,50 @@ function setupChartInteraction(projData) {
     [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
     tip.style.display='none';
   });
+}
+
+// ── FIRE Progress Bar ─────────────────────────────────────────────────────────
+function renderFireBar(d, container) {
+  if (!d.fireNumber || d.fireNumber <= 0) { container.innerHTML=''; return; }
+
+  const nfa    = d.netFinancialAssets;
+  const target = d.fireNumber;
+  const pct    = Math.min(nfa / target * 100, 100);
+  const remaining = Math.max(0, target - nfa);
+  const isAchieved = nfa >= target;
+
+  // Colour: red→yellow→green based on progress
+  const fillColor = pct >= 100 ? 'var(--green)' : pct >= 66 ? '#3fb950' : pct >= 33 ? 'var(--yellow)' : 'var(--red)';
+
+  // Milestone marker at 100% passive income / 4% = first milestone NW
+  const milestone1 = PASSIVE_INCOME_TARGET / 0.04;
+  const m1pct = Math.min(milestone1 / target * 100, 100);
+
+  const passiveLabel = `第1マイルストーン ¥${(milestone1/1e6).toFixed(1)}M (${PASSIVE_INCOME_TARGET.toLocaleString('ja-JP')}円/年 × 25)`;
+
+  container.innerHTML = `
+    <h2 style="margin-top:0">FIRE 達成度</h2>
+    <div class="fire-card">
+      <div class="fire-header">
+        <div>
+          <span class="fire-pct ${isAchieved?'gain':''}">${pct.toFixed(1)}%</span>
+          <span class="fire-meta" style="margin-left:10px">${isAchieved ? '🎉 FIRE 達成！' : `残り ${fmt(remaining)}`}</span>
+        </div>
+        <div class="fire-meta" style="text-align:right">
+          純金融資産 ${fmt(nfa)}<br>
+          FIRE 目標 ${fmt(target)}
+        </div>
+      </div>
+      <div class="fire-track" style="position:relative">
+        <div class="fire-fill" style="width:${pct.toFixed(2)}%;background:${fillColor}"></div>
+        ${m1pct < 100 && m1pct > 0 ? `<div class="fire-milestone" style="left:${m1pct.toFixed(2)}%"></div>` : ''}
+      </div>
+      <div class="fire-labels">
+        <span>¥0</span>
+        ${m1pct > 5 && m1pct < 95 ? `<span style="position:relative;left:${(m1pct-50).toFixed(1)}%" title="${passiveLabel}">¥${(milestone1/1e6).toFixed(0)}M ①</span>` : ''}
+        <span>${fmt(target)}</span>
+      </div>
+    </div>`;
 }
 
 // ── Monthly Waterfall ─────────────────────────────────────────────────────────
@@ -1148,6 +1202,10 @@ function extract(rows, pfRows) {
   d.nisa2026  = { name: nisaRow[10] || '2026年枠',    pctStr: nisaRow[11] || '', used: num(nisaRow[12]),   limit: num(nisaRow[13]) };
   d.nisaLife  = { name: lifetimeRow[10] || '生涯投資枠', pctStr: lifetimeRow[11] || '', used: num(lifetimeRow[12]), limit: num(lifetimeRow[13]) };
 
+  // FIRE & retirement (AA21=rows[20][26], AA22=rows[21][26])
+  d.retirementAge = num((rows[20]||[])[26]);
+  d.fireNumber    = num((rows[21]||[])[26]);  // NFA target (excl. real estate)
+
   // Real estate (rows 39-42)
   const re = rows[39] || [], nw = rows[40] || [], di = rows[41] || [], ds = rows[42] || [];
   const mRnd = v => '¥' + Math.round(v / 1000000) + 'M';
@@ -1380,6 +1438,9 @@ function render(d) {
         </div>
       </div>
 
+      <!-- FIRE progress -->
+      <div id="fireBarContainer"></div>
+
       <!-- History chart -->
       <div id="historyChartContainer"></div>
 
@@ -1551,6 +1612,7 @@ function render(d) {
 
   document.getElementById('dashboard').innerHTML = html;
   document.getElementById('dashboard-content').innerHTML = mainHtml;
+  renderFireBar(d, document.getElementById('fireBarContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
   renderMortgageSimulator(d, document.getElementById('mortgageSimContainer'));
