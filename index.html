@@ -72,6 +72,17 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .pct-bar-wrap { display: flex; align-items: center; }
 .pct-bar { height: 3px; border-radius: 2px; background: var(--blue); flex-shrink: 0; opacity: .6; }
 
+/* History chart */
+.hchart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 16px 12px; margin-bottom: 10px; position: relative; }
+.hchart-header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+.hchart-val { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hchart-delta { font-size: 13px; font-weight: 600; margin-left: 10px; }
+.hchart-periods { display: flex; gap: 4px; }
+.hchart-period { background: none; border: none; color: var(--muted); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; cursor: pointer; letter-spacing: .04em; }
+.hchart-period.active { background: var(--surface2); color: var(--text); }
+.hchart-svg { display: block; width: 100%; overflow: visible; }
+.hchart-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 10px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+
 /* Leverage */
 .lev-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .lev-header h2 { margin-bottom: 0; }
@@ -456,6 +467,184 @@ function setupChartInteraction(projData) {
     [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
     tip.style.display='none';
   });
+}
+
+function buildHistoryChart(history, period) {
+  if (!history || history.length < 2) return '<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">履歴データがありません</p>';
+
+  // Compute total NW and cost basis per row
+  function rowNW(r) {
+    return (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t4_land||0)+(r.t4_building||0)-(r.t4_mortgage||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
+  }
+  function rowCost(r) {
+    return (r.t1_index_cost||0)+(r.t2_cost||0)+(r.t3a_ideco_cost||0);
+  }
+
+  const all = history.map(r=>({date:r.date, nw:rowNW(r), cost:rowCost(r)})).filter(r=>r.nw!==0);
+  if (!all.length) return '<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">履歴データがありません</p>';
+
+  // Filter to period
+  const now = new Date();
+  let cutoff = null;
+  if (period==='7D')  cutoff = new Date(now - 7*864e5);
+  else if (period==='4W') cutoff = new Date(now - 28*864e5);
+  else if (period==='YTD') cutoff = new Date(now.getFullYear(),0,1);
+  else if (period==='1Y')  cutoff = new Date(now - 365*864e5);
+  // 'All' = no cutoff
+  const pts = cutoff ? all.filter(r=>r.date>=cutoff) : all;
+  const data = pts.length >= 2 ? pts : all;
+
+  const W=800, H=180, PL=0, PR=0, PT=10, PB=28;
+  const cW=W-PL-PR, cH=H-PT-PB;
+  const n=data.length;
+  const nwVals=data.map(r=>r.nw), costVals=data.map(r=>r.cost);
+  const allVals=[...nwVals,...costVals.filter(v=>v>0)];
+  const minV=Math.min(...allVals)*0.995, maxV=Math.max(...allVals)*1.005;
+  const xs=i=>PL+(i/(n-1))*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+
+  const startNW=data[0].nw, endNW=data[data.length-1].nw;
+  const delta=endNW-startNW, pct=startNW?delta/startNW*100:0;
+  const isGain=delta>=0;
+  const lineColor=isGain?'#3fb950':'#f85149';
+  const gradId='hg'+Math.random().toString(36).slice(2,6);
+
+  // NW polyline + gradient fill
+  const nwPts=data.map((r,i)=>`${xs(i).toFixed(1)},${ys(r.nw).toFixed(1)}`).join(' ');
+  const fillPts=`${xs(0).toFixed(1)},${H-PB} `+nwPts+` ${xs(n-1).toFixed(1)},${H-PB}`;
+  // Cost basis line (dashed, muted)
+  const costPts=data.filter(r=>r.cost>0);
+  let costLine='';
+  if(costPts.length>=2){
+    const cpStr=data.map((r,i)=>r.cost>0?`${xs(i).toFixed(1)},${ys(r.cost).toFixed(1)}`:null).filter(Boolean).join(' ');
+    costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
+  }
+
+  // X axis labels
+  let xLbls='';
+  const labelIdxs=[0, Math.floor(n/4), Math.floor(n/2), Math.floor(3*n/4), n-1];
+  const seen=new Set();
+  labelIdxs.forEach(i=>{
+    const lbl=data[i].date.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
+    if(seen.has(lbl))return; seen.add(lbl);
+    xLbls+=`<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="#6b7888" font-size="10">${lbl}</text>`;
+  });
+
+  // Interactive overlay
+  const overlayRect=`<rect id="hcOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
+  const hairline=`<line id="hcHair" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
+  const dot=`<circle id="hcDot" r="4" fill="${lineColor}" stroke="#0a0c13" stroke-width="2" visibility="hidden"/>`;
+
+  const svgStr=`<svg id="hcSvg" class="hchart-svg" viewBox="0 0 ${W} ${H}">
+  <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.25"/>
+    <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.02"/>
+  </linearGradient></defs>
+  <polygon points="${fillPts}" fill="url(#${gradId})"/>
+  ${costLine}
+  <polyline points="${nwPts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  ${xLbls}${hairline}${dot}${overlayRect}
+  </svg><div id="hcTip" class="hchart-tip"></div>`;
+
+  // Serialise data for interaction
+  return {svgStr, data, endNW, delta, pct, isGain, W, H, PL, PT, PB, cW, cH};
+}
+
+function setupHChartInteraction(info) {
+  const {data,W,H,PL,PT,PB,cW,cH} = info;
+  const n=data.length;
+  const nwVals=data.map(r=>r.nw), costVals=data.map(r=>r.cost);
+  const allVals=[...nwVals,...costVals.filter(v=>v>0)];
+  const minV=Math.min(...allVals)*0.995, maxV=Math.max(...allVals)*1.005;
+  const xs=i=>PL+(i/(n-1))*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
+
+  const svg=document.getElementById('hcSvg');
+  const ov=document.getElementById('hcOverlay');
+  const hl=document.getElementById('hcHair');
+  const dot=document.getElementById('hcDot');
+  const tip=document.getElementById('hcTip');
+  const valEl=document.getElementById('hcVal');
+  const dltEl=document.getElementById('hcDelta');
+  if(!svg||!ov) return;
+
+  const startNW=data[0].nw;
+
+  ov.addEventListener('mousemove', e=>{
+    const rect=svg.getBoundingClientRect();
+    const scaleX=rect.width/W;
+    const mxSvg=(e.clientX-rect.left)/scaleX;
+    const frac=Math.max(0,Math.min(1,(mxSvg-PL)/cW));
+    const i=Math.round(frac*(n-1));
+    const pt=data[i];
+    const hx=xs(i).toFixed(1);
+
+    hl.setAttribute('x1',hx);hl.setAttribute('x2',hx);hl.setAttribute('visibility','visible');
+    dot.setAttribute('cx',hx);dot.setAttribute('cy',ys(pt.nw).toFixed(1));dot.setAttribute('visibility','visible');
+
+    // Update header values on hover
+    if(valEl){valEl.textContent=fmt(pt.nw);}
+    const d=pt.nw-startNW, p=startNW?d/startNW*100:0;
+    if(dltEl){
+      dltEl.textContent=(d>=0?'+':'')+fmt(d)+' ('+(p>=0?'+':'')+p.toFixed(2)+'%)';
+      dltEl.className='hchart-delta '+(d>=0?'gain':'loss');
+    }
+
+    const tipX=e.clientX-rect.left, tipY=e.clientY-rect.top;
+    const flipLeft=tipX>rect.width*0.6;
+    tip.style.left=flipLeft?'auto':(tipX+12)+'px';
+    tip.style.right=flipLeft?(rect.width-tipX+12)+'px':'auto';
+    tip.style.top=Math.max(0,tipY-60)+'px';
+    const lbl=pt.date.toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric'});
+    tip.innerHTML=`<div style="font-size:11px;color:#6b7888;margin-bottom:4px;font-weight:700">${lbl}</div>`+
+      `<div style="margin-bottom:2px">純資産 ${fmt(pt.nw)}</div>`+
+      (pt.cost>0?`<div style="color:rgba(255,255,255,0.4)">簿価合計 ${fmt(pt.cost)}</div>`:'');
+    tip.style.display='block';
+  });
+
+  ov.addEventListener('mouseleave',()=>{
+    hl.setAttribute('visibility','hidden');
+    dot.setAttribute('visibility','hidden');
+    tip.style.display='none';
+    // Reset to current
+    if(valEl) valEl.textContent=fmt(info.endNW);
+    if(dltEl){
+      const d=info.delta,p=info.pct;
+      dltEl.textContent=(d>=0?'+':'')+fmt(d)+' ('+(p>=0?'+':'')+p.toFixed(2)+'%)';
+      dltEl.className='hchart-delta '+(d>=0?'gain':'loss');
+    }
+  });
+}
+
+function renderHistoryChart(history, container) {
+  const periods=['7D','4W','YTD','1Y','All'];
+  let activePeriod='All';
+
+  function draw() {
+    const info=buildHistoryChart(history, activePeriod);
+    if(typeof info==='string'){container.innerHTML=info;return;}
+    const {delta,pct,isGain,endNW,svgStr}=info;
+    container.innerHTML=`
+      <div class="hchart-card">
+        <h2 style="margin-top:0">純資産推移</h2>
+        <div class="hchart-header">
+          <div>
+            <span id="hcVal" class="hchart-val">${fmt(endNW)}</span>
+            <span id="hcDelta" class="hchart-delta ${isGain?'gain':'loss'}">${isGain?'+':''}${fmt(delta)} (${isGain?'+':''}${pct.toFixed(2)}%)</span>
+          </div>
+          <div class="hchart-periods">
+            ${periods.map(p=>`<button class="hchart-period${p===activePeriod?' active':''}" data-p="${p}">${p}</button>`).join('')}
+          </div>
+        </div>
+        ${svgStr}
+        <div style="margin-top:6px;font-size:10px;color:var(--muted)">
+          <span style="border-bottom:1.5px solid rgba(255,255,255,0.25);display:inline-block;width:16px;margin-right:4px;vertical-align:middle"></span>簿価合計（T1 Index + T2 + iDeCo）
+        </div>
+      </div>`;
+    container.querySelectorAll('.hchart-period').forEach(btn=>{
+      btn.addEventListener('click',()=>{activePeriod=btn.dataset.p;draw();});
+    });
+    setupHChartInteraction(info);
+  }
+  draw();
 }
 
 function renderProjection(d, history) {
@@ -959,6 +1148,9 @@ function render(d) {
         </div>
       </div>
 
+      <!-- History chart -->
+      <div id="historyChartContainer"></div>
+
       <!-- Row 2: equation -->
       <div class="eq-row">
         <div class="eq-card">
@@ -1051,10 +1243,7 @@ function render(d) {
           </div>`;
       }
       return `
-      <div class="lev-header">
-        <h2>レバレッジ健全性</h2>
-        <span class="lev-income">本年度年収：${fmtM(d.annualIncome)}</span>
-      </div>
+      <h2>レバレッジ健全性</h2>
       <div class="leverage-grid">
         ${levCard('LTV（自己持分）',     d.ltv.eq,        d.ltv.result,        d.ltv.target,        'ltv')}
         ${levCard('純資産カバー率',       d.nwCoverage.eq, d.nwCoverage.result, d.nwCoverage.target, 'nw')}
@@ -1124,6 +1313,7 @@ function render(d) {
 
   document.getElementById('dashboard').innerHTML = html;
   document.getElementById('dashboard-content').innerHTML = mainHtml;
+  renderHistoryChart(_history, document.getElementById('historyChartContainer'));
 
   // Tab switching
   document.getElementById('tabDash').addEventListener('click', () => {
