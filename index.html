@@ -669,42 +669,43 @@ function buildSummaryPayload(d, waterfallData) {
 async function regenerateSummary(d, waterfallData) {
   const btn = document.getElementById('aiGenerateBtn');
   if (!d.scriptUrl || !btn) return;
-  btn.textContent = '…';
+
+  const textEl = document.getElementById('aiSummaryText');
+  function setMsg(html) {
+    if (textEl) textEl.innerHTML = html;
+  }
+
+  btn.textContent = '⏳ Generating…';
   btn.disabled = true;
+  setMsg('<span class="ai-placeholder">Sending to Gemini — takes about 15 seconds…</span>');
 
   try {
-    const resp = await fetch(d.scriptUrl, {
+    // no-cors: bypasses CORS block; Apps Script still runs & writes AB21/AB22
+    // We can't read the response body, so we reload the sheet to get the result
+    await fetch(d.scriptUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      mode: 'no-cors',
       body: JSON.stringify(buildSummaryPayload(d, waterfallData))
     });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const json = await resp.json();
-    const summary = json.summary || json.text || '';
-    if (!summary) throw new Error('Empty response from Apps Script');
-
-    // Ensure text element exists (might be showing placeholder span)
-    let textEl = document.getElementById('aiSummaryText');
-    if (!textEl) {
-      textEl = document.createElement('div');
-      textEl.className = 'ai-text';
-      textEl.id = 'aiSummaryText';
-      document.querySelector('.ai-card').insertBefore(textEl, document.querySelector('.ai-footer'));
-    }
-    textEl.innerHTML = summary.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-
-    const dateEl = document.getElementById('aiSummaryDate');
-    if (dateEl) dateEl.textContent = 'Generated: Just now';
   } catch(err) {
-    let textEl = document.getElementById('aiSummaryText');
-    const msg = `⚠ ${err.message}`;
-    if (textEl) textEl.textContent = msg;
-    else document.querySelector('.ai-card').insertAdjacentHTML('afterbegin',
-      `<div style="color:var(--red);font-size:12px;margin-bottom:10px">${msg}</div>`);
-  } finally {
+    setMsg(`<span style="color:var(--red)">⚠ Network error: ${err.message}</span>`);
     btn.textContent = '✦ Generate';
     btn.disabled = false;
+    return;
   }
+
+  // Wait for Apps Script + Gemini to finish, then reload sheet data
+  let secs = 15;
+  const tick = setInterval(() => {
+    secs--;
+    if (secs > 0) {
+      setMsg(`<span class="ai-placeholder">Waiting for Gemini… reloading in ${secs}s</span>`);
+    } else {
+      clearInterval(tick);
+      setMsg('<span class="ai-placeholder">Reloading data…</span>');
+      loadAndRender();   // re-fetch sheet → picks up new AB21/AB22
+    }
+  }, 1000);
 }
 
 // ── FIRE Progress Bar ─────────────────────────────────────────────────────────
