@@ -671,31 +671,19 @@ async function regenerateSummary(d, waterfallData) {
   if (!d.scriptUrl || !btn) return;
 
   const textEl = document.getElementById('aiSummaryText');
-  function setMsg(html) {
-    if (textEl) textEl.innerHTML = html;
-  }
+  function setMsg(html) { if (textEl) textEl.innerHTML = html; }
 
   btn.textContent = '⏳ Generating…';
   btn.disabled = true;
-  setMsg('<span class="ai-placeholder">Sending to Gemini — takes about 15 seconds…</span>');
+  setMsg('<span class="ai-placeholder">Triggering Gemini — reloading in 20 seconds…</span>');
 
-  try {
-    // no-cors: bypasses CORS block; Apps Script still runs & writes AB21/AB22
-    // We can't read the response body, so we reload the sheet to get the result
-    await fetch(d.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(buildSummaryPayload(d, waterfallData))
-    });
-  } catch(err) {
-    setMsg(`<span style="color:var(--red)">⚠ Network error: ${err.message}</span>`);
-    btn.textContent = '✦ Generate';
-    btn.disabled = false;
-    return;
-  }
+  // Simple GET with no-cors — no body, no preflight, no redirect issues.
+  // Apps Script reads all metrics directly from the sheet, so no data needed here.
+  // We can't read the opaque response; instead we reload the sheet after a delay
+  // to pick up the summary written to AB21/AB22 by the script.
+  fetch(d.scriptUrl, { mode: 'no-cors' }).catch(() => {});
 
-  // Wait for Apps Script + Gemini to finish, then reload sheet data
-  let secs = 15;
+  let secs = 20;
   const tick = setInterval(() => {
     secs--;
     if (secs > 0) {
@@ -703,7 +691,7 @@ async function regenerateSummary(d, waterfallData) {
     } else {
       clearInterval(tick);
       setMsg('<span class="ai-placeholder">Reloading data…</span>');
-      loadAndRender();   // re-fetch sheet → picks up new AB21/AB22
+      loadAndRender();
     }
   }, 1000);
 }
