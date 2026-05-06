@@ -1,4 +1,4 @@
-const CACHE = 'bubbly-v4';
+const CACHE = 'bubbly-v5';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => e.waitUntil(
@@ -12,6 +12,7 @@ self.addEventListener('activate', e => e.waitUntil(
 ));
 
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;          // never intercept POST/non-GET
   if (e.request.url.includes('docs.google.com')) return;
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
