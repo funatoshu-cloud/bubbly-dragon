@@ -1,4 +1,4 @@
-const CACHE = 'bubbly-v2';
+const CACHE = 'bubbly-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => e.waitUntil(

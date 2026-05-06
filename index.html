@@ -99,9 +99,31 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .lev-green { color: var(--green); }
 .lev-yellow { color: var(--yellow); }
 .lev-red { color: var(--red); }
+.lev-tint-green  { background: linear-gradient(135deg, var(--surface), rgba(63,185,80,0.09)); border-color: rgba(63,185,80,0.28); }
+.lev-tint-yellow { background: linear-gradient(135deg, var(--surface), rgba(210,153,34,0.09)); border-color: rgba(210,153,34,0.28); }
+.lev-tint-red    { background: linear-gradient(135deg, var(--surface), rgba(248,81,73,0.09));  border-color: rgba(248,81,73,0.28); }
 .ok { color: var(--green); }
 .warn { color: var(--yellow); }
 .bad { color: var(--red); }
+
+/* Consistent font across all SVG charts */
+svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+
+/* Savings rate */
+.sr-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:10px; }
+.sr-rate { font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
+.sr-sub  { font-size:11px; color:var(--muted); margin-top:4px; }
+.sr-bar-track { height:4px; background:rgba(255,255,255,0.07); border-radius:2px; margin-top:12px; overflow:hidden; }
+.sr-bar-fill  { height:100%; border-radius:2px; transition:width .4s ease; }
+
+/* AI Summary */
+.ai-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:10px; }
+.ai-text { font-size:13px; line-height:1.75; color:var(--text); white-space:pre-wrap; }
+.ai-placeholder { font-size:12px; color:var(--muted); font-style:italic; }
+.ai-footer { display:flex; align-items:center; justify-content:space-between; margin-top:14px; flex-wrap:wrap; gap:8px; border-top:1px solid var(--border); padding-top:10px; }
+.ai-ts { font-size:11px; color:var(--muted); }
+.ai-setup { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 14px; font-size:12px; line-height:1.6; color:var(--muted); }
+.ai-setup code { background:rgba(255,255,255,0.06); border-radius:3px; padding:1px 5px; font-family:monospace; color:var(--text); font-size:11px; }
 
 /* FIRE progress bar */
 .fire-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:10px; }
@@ -206,7 +228,7 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .proj-warning.red { background:rgba(248,81,73,.1); border-color:var(--red); color:var(--red); }
 .proj-warning.yellow { background:rgba(210,153,34,.1); border-color:var(--yellow); color:var(--yellow); }
 .proj-inputs { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
-.proj-group { display:flex; flex-direction:column; gap:5px; }
+.proj-group { display:flex; flex-direction:column; gap:5px; min-width:140px; }
 .proj-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
 .proj-select,.proj-number { background:var(--surface2); border:1px solid var(--border); border-radius:5px; color:var(--text); padding:5px 10px; font-size:13px; }
 .proj-select { min-width:160px; } .proj-number { width:150px; }
@@ -246,6 +268,10 @@ input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
   .lev-actual { font-size: 20px; }
   .msim-stats { grid-template-columns: repeat(2,1fr); }
   .msim-result { grid-template-columns: 1fr; }
+  .proj-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .proj-group { min-width: 0; }
+  .proj-select, .proj-number { width: 100%; font-size: 14px; padding: 7px 10px; }
+  input[type=range] { width: 100%; }
 }
 </style>
 </head>
@@ -377,7 +403,7 @@ function buildProjection(rates, months, stopMonths) {
 }
 
 function buildChart(projData, currentNW, targetNW, coastNW) {
-  const W=800,H=260,PL=72,PR=20,PT=20,PB=40;
+  const W=800,H=320,PL=72,PR=20,PT=10,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
   const months=projData[projData.length-1].month;
   const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
@@ -399,10 +425,14 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
     yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${(v/1000000).toFixed(0)}M</text>`;
   }
   let xLbl='';
-  for(let yr=0;yr<=Math.floor(months/12);yr++){
-    const x=xs(yr*12).toFixed(1);
-    xLbl+=`<text x="${x}" y="${H-PB+16}" text-anchor="middle" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
-    if(yr>0) grid+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
+  const totalYrs=Math.floor(months/12);
+  for(let yr=0;yr<=totalYrs;yr++){
+    const x=xs(yr*12);
+    const isFirst=yr===0, isLast=yr===totalYrs;
+    const anchor=isFirst?'start':isLast?'end':'middle';
+    const lx=isFirst?x+2:isLast?x-2:x;
+    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
+    if(yr>0) grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
   }
   let zeroLine='';
   if(minV<0&&maxV>0){const y0=ys(0).toFixed(1);zeroLine=`<line x1="${PL}" y1="${y0}" x2="${W-PR}" y2="${y0}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/><text x="${PL-6}" y="${y0}" text-anchor="end" dominant-baseline="middle" fill="rgba(255,255,255,0.35)" font-size="10">0</text>`;}
@@ -412,27 +442,20 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
     const yT=ys(targetNW).toFixed(1);
     targetLine=`<line x1="${PL}" y1="${yT}" x2="${W-PR}" y2="${yT}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,4"/><text x="${W-PR+4}" y="${yT}" dominant-baseline="middle" fill="#58a6ff" font-size="9">Target</text>`;
   }
-  // Coast FIRE curve: NW needed at each month to coast to FIRE without contributions
+  // Coast FIRE curve
   let coastLine='';
   if(coastNW&&coastNW.length&&coastNW[0]>minV){
     const coastPts=coastNW.map((v,m)=>v>=minV&&v<=maxV*1.1?`${xs(m).toFixed(1)},${ys(Math.min(v,maxV)).toFixed(1)}`:null).filter(Boolean).join(' ');
     if(coastPts) coastLine=`<polyline points="${coastPts}" fill="none" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="6,3"/>`;
-    // Label at end
     const lastVisible=coastNW.reduce((acc,v,m)=>v>=minV&&v<=maxV*1.1?m:acc,-1);
-    if(lastVisible>0) coastLine+=`<text x="${xs(lastVisible).toFixed(1)}" y="${ys(coastNW[lastVisible]).toFixed(1)-6}" text-anchor="middle" fill="#f0883e" font-size="9">Coast FIRE</text>`;
+    if(lastVisible>0){const lx=xs(lastVisible),isRight=lx>W*0.75;coastLine+=`<text x="${(isRight?lx-2:lx).toFixed(1)}" y="${(ys(coastNW[lastVisible])-6).toFixed(1)}" text-anchor="${isRight?'end':'middle'}" fill="#f0883e" font-size="9">Coast FIRE</text>`;}
   }
-  const legendY=PT+8;
-  const legend=`<circle cx="${PL+8}" cy="${legendY}" r="4" fill="#3fb950"/><text x="${PL+16}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Optimistic</text>
-  <line x1="${PL+82}" y1="${legendY}" x2="${PL+96}" y2="${legendY}" stroke="#58a6ff" stroke-width="2.5"/><text x="${PL+100}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Base</text>
-  <circle cx="${PL+142}" cy="${legendY}" r="4" fill="#f85149"/><text x="${PL+150}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Pessimistic</text>
-  ${coastNW&&coastNW.length?`<line x1="${PL+192}" y1="${legendY}" x2="${PL+206}" y2="${legendY}" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/><text x="${PL+210}" y="${legendY}" dominant-baseline="middle" fill="#6b7888" font-size="10">Coast FIRE</text>`:''}
-  `;
 
   const hairline=`<line id="chartHairline" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2" pointer-events="none" visibility="hidden"/>`;
   const dots=`<circle id="chartDotOpt" r="4" fill="rgba(63,185,80,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
   <circle id="chartDotBase" r="4" fill="#58a6ff" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
   <circle id="chartDotPess" r="4" fill="rgba(248,81,73,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>`;
-  const overlay=`<rect id="chartOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
+  const overlay=`<rect id="chartOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair;touch-action:none"/>`;
 
   return `<svg id="projSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
   ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}${coastLine}
@@ -441,13 +464,12 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   ${line('optimistic','rgba(63,185,80,0.7)','5,4')}
   ${line('base','#58a6ff')}
   <circle cx="${xs(0).toFixed(1)}" cy="${ys(currentNW).toFixed(1)}" r="5" fill="#58a6ff" stroke="#090c13" stroke-width="2"/>
-  ${legend}
   ${hairline}${dots}${overlay}
   </svg>`;
 }
 
 function setupChartInteraction(projData) {
-  const W=800,H=260,PL=72,PR=20,PT=20,PB=40;
+  const W=800,H=320,PL=72,PR=20,PT=10,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
   const maxM=projData[projData.length-1].month;
   const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
@@ -481,10 +503,9 @@ function setupChartInteraction(projData) {
     return `${d.getFullYear()}年 ${MONTHS_JP[d.getMonth()]}`;
   }
 
-  ov.addEventListener('mousemove', e=>{
-    const rect=svg.getBoundingClientRect();
-    const scaleX=rect.width/W, scaleY=rect.height/H;
-    const mxSvg=(e.clientX-rect.left)/scaleX;
+  function showAt(clientX, clientY, containerRect) {
+    const scaleX=containerRect.width/W;
+    const mxSvg=(clientX-containerRect.left)/scaleX;
     const frac=Math.max(0,Math.min(1,(mxSvg-PL)/cW));
     const m=Math.round(frac*maxM);
     const pt=lookup.get(m)||projData[projData.length-1];
@@ -495,23 +516,195 @@ function setupChartInteraction(projData) {
       el.setAttribute('cx',hx); el.setAttribute('cy',ys(pt[key]).toFixed(1)); el.setAttribute('visibility','visible');
     });
 
-    const tipX=e.clientX-rect.left, tipY=e.clientY-rect.top;
-    const flipLeft=tipX>rect.width*0.62;
+    const tipX=clientX-containerRect.left, tipY=clientY-containerRect.top;
+    const flipLeft=tipX>containerRect.width*0.62;
     tip.style.left=flipLeft?'auto':(tipX+14)+'px';
-    tip.style.right=flipLeft?(rect.width-tipX+14)+'px':'auto';
-    tip.style.top=Math.max(0,tipY-50)+'px';
+    tip.style.right=flipLeft?(containerRect.width-tipX+14)+'px':'auto';
+    tip.style.top=Math.max(0,tipY-56)+'px';
     tip.innerHTML=`<div style="font-size:11px;font-weight:700;color:#6b7888;margin-bottom:6px;letter-spacing:.04em">${monthLabel(pt.month)}</div>`+
       `<div style="color:rgba(63,185,80,0.9);margin-bottom:2px">▲ ${fmt(pt.optimistic)}</div>`+
       `<div style="color:#58a6ff;margin-bottom:2px">— ${fmt(pt.base)}</div>`+
       `<div style="color:rgba(248,81,73,0.85)">▼ ${fmt(pt.pessimistic)}</div>`;
     tip.style.display='block';
-  });
+  }
 
-  ov.addEventListener('mouseleave',()=>{
+  function hide() {
     hl.setAttribute('visibility','hidden');
     [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
     tip.style.display='none';
+  }
+
+  ov.addEventListener('mousemove', e=>{
+    showAt(e.clientX, e.clientY, svg.getBoundingClientRect());
   });
+  ov.addEventListener('mouseleave', hide);
+
+  // Touch support for mobile
+  ov.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    showAt(t.clientX, t.clientY, svg.getBoundingClientRect());
+  }, {passive:false});
+  ov.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    const t=e.touches[0];
+    showAt(t.clientX, t.clientY, svg.getBoundingClientRect());
+  }, {passive:false});
+  ov.addEventListener('touchend', ()=>{
+    setTimeout(hide, 1200);
+  });
+}
+
+// ── Savings Rate ──────────────────────────────────────────────────────────────
+function renderSavingsRate(d, waterfallData, container) {
+  if (!waterfallData || !waterfallData.length) { container.innerHTML = ''; return; }
+  const last = waterfallData[waterfallData.length - 1];
+  const contrib = last.contrib;
+  const income = d.monthlyIncome;
+
+  if (!income) {
+    container.innerHTML = `<h2>月次貯蓄率</h2>
+      <div class="sr-card" style="color:var(--muted);font-size:12px">
+        月収を data clean シートの <strong>AA24</strong> に入力してください
+      </div>`;
+    return;
+  }
+
+  const rate = contrib / income * 100;
+  const barPct = Math.min(rate, 50) / 50 * 100; // cap bar at 50% = full
+  const rateColor = rate >= 30 ? 'var(--green)' : rate >= 20 ? 'var(--yellow)' : 'var(--red)';
+  const [yr, mo] = last.month.split('-');
+
+  container.innerHTML = `<h2>月次貯蓄率</h2>
+    <div class="sr-card">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+        <div>
+          <div class="sr-rate" style="color:${rateColor}">${rate.toFixed(1)}%</div>
+          <div class="sr-sub">${fmt(contrib)} 投資 ÷ ${fmt(income)} 月収 &nbsp;·&nbsp; ${parseInt(mo)}月${yr}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">目標</div>
+          <div style="font-size:14px;font-weight:700;color:var(--muted)">30%</div>
+        </div>
+      </div>
+      <div class="sr-bar-track">
+        <div class="sr-bar-fill" style="width:${barPct.toFixed(1)}%;background:${rateColor}"></div>
+      </div>
+    </div>`;
+}
+
+// ── AI Summary ────────────────────────────────────────────────────────────────
+function renderAISummary(d, waterfallData, container) {
+  const summary   = d.aiSummary;
+  const tsRaw     = d.aiSummaryDate;
+  const scriptUrl = d.scriptUrl;
+
+  let tsLabel = '';
+  if (tsRaw) {
+    try { tsLabel = 'Generated: ' + new Date(tsRaw).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}); }
+    catch(_) { tsLabel = 'Generated: ' + tsRaw; }
+  }
+
+  let bodyHtml;
+  if (!scriptUrl) {
+    bodyHtml = `<div class="ai-setup">
+      <strong style="color:var(--text)">Setup required</strong><br>
+      1. Create an Apps Script web app (see plan for <code>doPost</code> code)<br>
+      2. Store your Gemini key in Script Properties as <code>GEMINI_KEY</code><br>
+      3. Deploy → copy URL → paste it into <code>AA26</code> in data clean sheet<br>
+      4. The summary will appear here on next data load, and sync to all devices automatically
+    </div>`;
+  } else {
+    bodyHtml = `<div class="ai-text" id="aiSummaryText">${
+      summary
+        ? summary.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        : '<span class="ai-placeholder">No summary yet — click ✦ Generate to create your first monthly snapshot</span>'
+    }</div>`;
+  }
+
+  container.innerHTML = `
+    <h2>AI サマリー</h2>
+    <div class="ai-card">
+      ${bodyHtml}
+      <div class="ai-footer">
+        <span class="ai-ts" id="aiSummaryDate">${tsLabel}</span>
+        ${scriptUrl ? `<button class="btn" id="aiGenerateBtn" style="font-size:11px;padding:5px 14px">✦ Generate</button>` : ''}
+      </div>
+    </div>`;
+
+  if (scriptUrl) {
+    document.getElementById('aiGenerateBtn').addEventListener('click', () => regenerateSummary(d, waterfallData));
+  }
+}
+
+function buildSummaryPayload(d, waterfallData) {
+  const fireProgress = d.fireNumber > 0 ? (d.netFinancialAssets / d.fireNumber * 100).toFixed(1) : null;
+  return {
+    date: new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}),
+    totalNetWorth:       d.totalNetWorth,
+    netFinancialAssets:  d.netFinancialAssets,
+    fireNumber:          d.fireNumber,
+    fireProgressPct:     fireProgress,
+    retirementAge:       d.retirementAge,
+    currentAge:          d.currentAge,
+    monthlyIncome:       d.monthlyIncome,
+    mortgage:            d.mortgage,
+    leverage: {
+      ltv:        d.ltv.actual,
+      nwCoverage: d.nwCoverage.actual,
+      debtIncome: d.debtIncome.val,
+      dscr:       d.dscr.val
+    },
+    waterfallLast3: (waterfallData || []).slice(-3).map(w => ({
+      month:           w.month,
+      contributions:   Math.round(w.contrib),
+      returns:         Math.round(w.returns),
+      mortgagePaydown: Math.round(w.mortgagePaydown),
+      reChange:        Math.round(w.reChange),
+      total:           Math.round(w.total)
+    }))
+  };
+}
+
+async function regenerateSummary(d, waterfallData) {
+  const btn = document.getElementById('aiGenerateBtn');
+  if (!d.scriptUrl || !btn) return;
+  btn.textContent = '…';
+  btn.disabled = true;
+
+  try {
+    const resp = await fetch(d.scriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildSummaryPayload(d, waterfallData))
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const summary = json.summary || json.text || '';
+    if (!summary) throw new Error('Empty response from Apps Script');
+
+    // Ensure text element exists (might be showing placeholder span)
+    let textEl = document.getElementById('aiSummaryText');
+    if (!textEl) {
+      textEl = document.createElement('div');
+      textEl.className = 'ai-text';
+      textEl.id = 'aiSummaryText';
+      document.querySelector('.ai-card').insertBefore(textEl, document.querySelector('.ai-footer'));
+    }
+    textEl.innerHTML = summary.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    const dateEl = document.getElementById('aiSummaryDate');
+    if (dateEl) dateEl.textContent = 'Generated: Just now';
+  } catch(err) {
+    let textEl = document.getElementById('aiSummaryText');
+    const msg = `⚠ ${err.message}`;
+    if (textEl) textEl.textContent = msg;
+    else document.querySelector('.ai-card').insertAdjacentHTML('afterbegin',
+      `<div style="color:var(--red);font-size:12px;margin-bottom:10px">${msg}</div>`);
+  } finally {
+    btn.textContent = '✦ Generate';
+    btn.disabled = false;
+  }
 }
 
 // ── FIRE Progress Bar ─────────────────────────────────────────────────────────
@@ -643,7 +836,13 @@ function renderWaterfallChart(history, container) {
       else if(val<0){ const y1=ys(negBase),y2=ys(negBase+val); bars+=`<rect x="${x}" y="${y1.toFixed(1)}" width="${bw}" height="${(y2-y1).toFixed(1)}" fill="${negC}" rx="2" opacity="0.8"/>`; negBase+=val; }
     });
     const [yr,mo]=d.month.split('-');
-    xLbl+=`<text x="${cx.toFixed(1)}" y="${H-PB+16}" text-anchor="middle" fill="#6b7888" font-size="10">${parseInt(mo)}月${i===0||mo==='01'?` '${yr.slice(2)}`:''}${mo==='01'?'':''}</text>`;
+    const moNum=parseInt(mo);
+    const showYear=i===0||mo==='01';
+    const label=showYear?`'${yr.slice(2)}/${moNum}月`:`${moNum}月`;
+    const isFirst=i===0, isLast=i===n-1;
+    const anchor=isFirst?'start':isLast?'end':'middle';
+    const lx=isFirst?Math.max(cx,PL+2):isLast?Math.min(cx,W-PR-2):cx;
+    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+16}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${label}</text>`;
   });
 
   const overlay=`<rect id="wfOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
@@ -726,7 +925,7 @@ function renderMortgageSimulator(d, container) {
     const bp=baseArr.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
     const ap=accel.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
     let grid='',xLbl='',yLbl='';
-    for(let yr=0;yr<=MORTGAGE_TERM_YEARS;yr+=5){ const x=xs(yr*12).toFixed(1); grid+=`<line x1="${x}" y1="${PT}" x2="${x}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`; xLbl+=`<text x="${x}" y="${H-PB+14}" text-anchor="middle" fill="#6b7888" font-size="10">${yr}年</text>`; }
+    for(let yr=0;yr<=MORTGAGE_TERM_YEARS;yr+=5){ const x=xs(yr*12); const isFirst=yr===0,isLast=yr===MORTGAGE_TERM_YEARS; const anchor=isFirst?'start':isLast?'end':'middle'; const lx=isFirst?x+2:isLast?x-2:x; grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`; xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr}年</text>`; }
     for(let i=0;i<=3;i++){ const v=balance*i/3, y=ys(v).toFixed(1); grid+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.04)"/>`; yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${(v/1e6).toFixed(0)}M</text>`; }
     document.getElementById('msimChart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${grid}${yLbl}${xLbl}
       <polyline points="${bp}" fill="none" stroke="rgba(248,81,73,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
@@ -829,14 +1028,17 @@ function buildHistoryChart(history, period) {
     costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
   }
 
-  // X axis labels
+  // X axis labels — smart anchoring to prevent edge clipping
   let xLbls='';
   const labelIdxs=[0, Math.floor(n/4), Math.floor(n/2), Math.floor(3*n/4), n-1];
   const seen=new Set();
-  labelIdxs.forEach(i=>{
-    const lbl=data[i].date.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
+  labelIdxs.forEach((idx,pos)=>{
+    const lbl=data[idx].date.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
     if(seen.has(lbl))return; seen.add(lbl);
-    xLbls+=`<text x="${xs(i).toFixed(1)}" y="${H-4}" text-anchor="middle" fill="#6b7888" font-size="10">${lbl}</text>`;
+    const isFirst=pos===0, isLast=pos===labelIdxs.length-1||idx===n-1;
+    const anchor=isFirst?'start':isLast?'end':'middle';
+    const x=isFirst?xs(idx)+2:isLast?xs(idx)-2:xs(idx);
+    xLbls+=`<text x="${x.toFixed(1)}" y="${H-4}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${lbl}</text>`;
   });
 
   // Interactive overlay
@@ -1024,7 +1226,14 @@ function renderProjection(d, history) {
       </div>
     </div>
     <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
-    <div class="card" style="padding:14px 14px 10px"><div id="pChart"></div><div id="pAnnotation" style="margin-top:6px"></div></div>
+    <div id="pLegend" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--muted);padding:2px 0;letter-spacing:.02em">
+      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>Optimistic</span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>Base</span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#f85149"/></svg>Pessimistic</span>
+      <span id="pLegendCoast" style="display:none;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/></svg>Coast FIRE</span>
+    </div>
+    <div class="card" style="padding:6px 6px 0"><div id="pChart"></div><div id="pAnnotation" style="padding:4px 6px 8px;font-size:12px"></div></div>
+    <div id="pLongWarn" style="display:none;margin-top:6px;font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</div>
     <div class="card" style="padding:0;overflow-x:auto;margin-top:10px">
       <table class="proj-table">
         <thead><tr><th style="text-align:left">Bucket</th><th>Current</th><th>Projected</th><th>Capital added</th><th>Returns</th><th>Ann. rate</th></tr></thead>
@@ -1096,7 +1305,8 @@ function renderProjection(d, history) {
       ann=hit?`<span style="font-size:12px;color:var(--green)">📈 Base reaches target in ${Math.floor(hit.month/12)}y ${hit.month%12}m</span>`
              :`<span style="font-size:12px;color:var(--muted)">Base scenario does not reach target within ${yrs} years</span>`;
     }
-    if(months>histDays*5) ann+=(ann?'&ensp;':'')+'<span style="font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</span>';
+    const longWarn=document.getElementById('pLongWarn');
+    if(longWarn) longWarn.style.display=months>histDays*5?'block':'none';
     document.getElementById('pAnnotation').innerHTML=ann;
 
     // Coast FIRE curve: NW needed at month m to reach fireNumber by retirement without contributions
@@ -1126,6 +1336,8 @@ function renderProjection(d, history) {
 
     document.getElementById('pChart').innerHTML=buildChart(projData,currentNW,(!excludeRE&&target)||null,coastCurve);
     setupChartInteraction(projData);
+    const coastLegEl=document.getElementById('pLegendCoast');
+    if(coastLegEl) coastLegEl.style.display=coastCurve&&coastCurve.length?'flex':'none';
 
     // Summary table
     let totalCur=0,totalProj=0,totalCap=0,totalRet=0;
@@ -1257,6 +1469,12 @@ function extract(rows, pfRows) {
   d.retirementAge = num((rows[20]||[])[26]);
   d.fireNumber    = num((rows[21]||[])[26]);  // NFA target (excl. real estate)
   d.currentAge    = num((rows[22]||[])[26]);
+  // Savings rate input (AA24=rows[23][26]), Apps Script config (AA26=rows[25][26])
+  d.monthlyIncome = num((rows[23]||[])[26]);   // AA24: monthly net income
+  d.scriptUrl     = ((rows[25]||[])[26]||'').trim(); // AA26: Apps Script web app URL
+  // AI summary written back by Apps Script (AB21=rows[20][27], AB22=rows[21][27])
+  d.aiSummary     = ((rows[20]||[])[27]||'').trim(); // AB21
+  d.aiSummaryDate = ((rows[21]||[])[27]||'').trim(); // AB22
 
   // Real estate (rows 39-42)
   const re = rows[39] || [], nw = rows[40] || [], di = rows[41] || [], ds = rows[42] || [];
@@ -1496,6 +1714,12 @@ function render(d) {
       <!-- History chart -->
       <div id="historyChartContainer"></div>
 
+      <!-- Savings rate -->
+      <div id="savingsRateContainer"></div>
+
+      <!-- AI Summary -->
+      <div id="aiSummaryContainer"></div>
+
       <!-- Monthly waterfall -->
       <div id="waterfallContainer"></div>
 
@@ -1577,8 +1801,9 @@ function render(d) {
       }
       function levCard(title, eq, actual, target, metric) {
         const cls = lc(metric);
+        const tint = 'lev-tint-' + cls.replace('lev-', '');
         return `
-          <div class="lev-card">
+          <div class="lev-card ${tint}">
             <div class="lev-title">${title}</div>
             <div class="lev-eq">${eq}</div>
             <div class="lev-body">
@@ -1666,6 +1891,9 @@ function render(d) {
   document.getElementById('dashboard-content').innerHTML = mainHtml;
   renderFireBar(d, document.getElementById('fireBarContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
+  const _waterfallData = buildWaterfallData(_history);
+  renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
+  renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
   renderMortgageSimulator(d, document.getElementById('mortgageSimContainer'));
 
