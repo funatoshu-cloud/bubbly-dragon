@@ -652,18 +652,38 @@ function renderAISummary(d, waterfallData, container) {
     }</div>`;
   }
 
+  const hasContent = !!summary;
+  // Default open if summary exists, closed if not yet generated
+  const defaultOpen = hasContent;
+
   container.innerHTML = `
-    <h2>AI サマリー</h2>
-    <div class="ai-card">
-      ${bodyHtml}
-      <div class="ai-footer">
-        <span class="ai-ts" id="aiSummaryDate">${tsLabel}</span>
-        ${scriptUrl ? `<button class="btn" id="aiGenerateBtn" style="font-size:11px;padding:5px 14px">✦ Generate</button>` : ''}
+    <h2 id="aiToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+      AI サマリー
+      <span id="aiChevron" style="font-size:11px;color:var(--muted);transition:transform .2s;transform:${defaultOpen?'rotate(90deg)':'rotate(0deg)'}">&rsaquo;</span>
+    </h2>
+    <div id="aiBody" style="display:${defaultOpen?'block':'none'}">
+      <div class="ai-card">
+        ${bodyHtml}
+        <div class="ai-footer">
+          <span class="ai-ts" id="aiSummaryDate">${tsLabel}</span>
+          ${scriptUrl ? `<button class="btn" id="aiGenerateBtn" style="font-size:11px;padding:5px 14px">✦ Generate</button>` : ''}
+        </div>
       </div>
     </div>`;
 
+  document.getElementById('aiToggle').addEventListener('click', () => {
+    const body = document.getElementById('aiBody');
+    const chevron = document.getElementById('aiChevron');
+    const open = body.style.display === 'none';
+    body.style.display = open ? 'block' : 'none';
+    chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+  });
+
   if (scriptUrl) {
-    document.getElementById('aiGenerateBtn').addEventListener('click', () => regenerateSummary(d, waterfallData));
+    document.getElementById('aiGenerateBtn').addEventListener('click', (e) => {
+      e.stopPropagation(); // prevent toggle firing
+      regenerateSummary(d, waterfallData);
+    });
   }
 }
 
@@ -1154,8 +1174,8 @@ function renderHistoryChart(history, container) {
     if(typeof info==='string'){container.innerHTML=info;return;}
     const {delta,pct,isGain,endNW,svgStr}=info;
     container.innerHTML=`
+      <h2>純資産推移</h2>
       <div class="hchart-card">
-        <h2 style="margin-top:0">純資産推移</h2>
         <div class="hchart-header">
           <div>
             <span id="hcVal" class="hchart-val">${fmt(endNW)}</span>
