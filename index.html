@@ -110,7 +110,7 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .fire-meta { font-size:11px; color:var(--muted); }
 .fire-track { height:8px; background:var(--surface2); border-radius:4px; overflow:hidden; margin-bottom:8px; }
 .fire-fill { height:100%; border-radius:4px; transition:width .4s ease; }
-.fire-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
+.fire-labels { position:relative; font-size:10px; color:var(--muted); height:16px; }
 .fire-milestone { position:absolute; top:0; height:100%; border-left:2px dashed rgba(255,255,255,0.2); }
 
 /* Waterfall chart */
@@ -530,11 +530,23 @@ function renderFireBar(d, container) {
   // Colour: red→yellow→green based on progress
   const fillColor = pct >= 100 ? 'var(--green)' : pct >= 66 ? '#3fb950' : pct >= 33 ? 'var(--yellow)' : 'var(--red)';
 
-  // Milestone marker at 100% passive income / 4% = first milestone NW
-  const milestone1 = PASSIVE_INCOME_TARGET / 0.04;
-  const m1pct = Math.min(milestone1 / target * 100, 100);
+  // Significant round-number milestones that fall between current NFA and FIRE target
+  const MILESTONES = [50e6, 100e6, 200e6, 300e6, 500e6];
+  const visibleMilestones = MILESTONES.filter(m => m > 0 && m < target);
 
-  const passiveLabel = `第1マイルストーン ¥${(milestone1/1e6).toFixed(1)}M (${PASSIVE_INCOME_TARGET.toLocaleString('ja-JP')}円/年 × 25)`;
+  const markerHtml = visibleMilestones.map(m => {
+    const mpct = (m / target * 100).toFixed(2);
+    return `<div class="fire-milestone" style="left:${mpct}%"></div>`;
+  }).join('');
+
+  // Labels: only show milestone labels that aren't too cramped (>8% apart from neighbours and edges)
+  const labelPoints = [0, ...visibleMilestones.map(m => m/target*100), 100];
+  const milestoneLabels = visibleMilestones.map((m, i) => {
+    const mpct = m / target * 100;
+    const prev = labelPoints[i], next = labelPoints[i + 2];
+    if (mpct - prev < 8 || next - mpct < 8) return '';
+    return `<span style="position:absolute;left:${mpct.toFixed(1)}%;transform:translateX(-50%);white-space:nowrap">¥${Math.round(m/1e6)}M</span>`;
+  }).join('');
 
   container.innerHTML = `
     <h2 style="margin-top:0">FIRE 達成度</h2>
@@ -551,12 +563,12 @@ function renderFireBar(d, container) {
       </div>
       <div class="fire-track" style="position:relative">
         <div class="fire-fill" style="width:${pct.toFixed(2)}%;background:${fillColor}"></div>
-        ${m1pct < 100 && m1pct > 0 ? `<div class="fire-milestone" style="left:${m1pct.toFixed(2)}%"></div>` : ''}
+        ${markerHtml}
       </div>
-      <div class="fire-labels">
-        <span>¥0</span>
-        ${m1pct > 5 && m1pct < 95 ? `<span style="position:relative;left:${(m1pct-50).toFixed(1)}%" title="${passiveLabel}">¥${(milestone1/1e6).toFixed(0)}M ①</span>` : ''}
-        <span>${fmt(target)}</span>
+      <div class="fire-labels" style="position:relative;height:16px">
+        <span style="position:absolute;left:0">¥0</span>
+        ${milestoneLabels}
+        <span style="position:absolute;right:0">${fmt(target)}</span>
       </div>
     </div>`;
 }
