@@ -1049,7 +1049,7 @@ async function regenerateSummary(d, waterfallData) {
 
   btn.textContent = '⏳ Generating…';
   btn.disabled = true;
-  setMsg('<span class="ai-placeholder">Triggering Gemini — reloading in 20 seconds…</span>');
+  setMsg('<span class="ai-placeholder">Triggering Gemini — reloading in 30 seconds…</span>');
 
   // Build URL params: feedback (fb) + MoM snapshot (mom)
   const fb  = buildFeedbackParam();
@@ -1063,13 +1063,18 @@ async function regenerateSummary(d, waterfallData) {
   // Apps Script reads all metrics directly from the sheet, so no data needed here.
   // We can't read the opaque response; instead we reload the sheet after a delay
   // to pick up the summary written to AB21/AB22 by the script.
-  fetch(url, { mode: 'no-cors' }).catch(() => {});
+  console.log('[WealthTrack] Triggering Apps Script:', url);
+  fetch(url, { mode: 'no-cors' }).then(() => {
+    console.log('[WealthTrack] Fetch fired (opaque response — check Apps Script execution logs if sheet not updated)');
+  }).catch(err => {
+    console.error('[WealthTrack] Fetch failed:', err);
+  });
 
-  let secs = 20;
+  let secs = 30;
   const tick = setInterval(() => {
     secs--;
     if (secs > 0) {
-      setMsg(`<span class="ai-placeholder">Waiting for Gemini… reloading in ${secs}s</span>`);
+      setMsg(`<span class="ai-placeholder">Waiting for Gemini… reloading in ${secs}s &nbsp;<span style="font-size:10px;color:var(--muted)">(check Apps Script execution logs if it fails)</span></span>`);
     } else {
       clearInterval(tick);
       setMsg('<span class="ai-placeholder">Reloading data…</span>');
