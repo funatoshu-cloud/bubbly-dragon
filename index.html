@@ -653,6 +653,8 @@ function renderSavingsRate(d, waterfallData, container) {
   const rateColor = rate >= 25 ? 'var(--green)' : rate >= 15 ? 'var(--yellow)' : 'var(--red)';
   const [yr, mo] = last.month.split('-');
 
+  const periodLabel = last._mtd ? `${parseInt(mo)}月${yr} MTD` : `${parseInt(mo)}月${yr}`;
+
   // Wife's mortgage support — temporary ¥90K/mo through March 2027
   const WIFE_MORTGAGE = 90000;
   const showWifeMortgage = new Date() < new Date('2027-04-01');
@@ -672,7 +674,7 @@ function renderSavingsRate(d, waterfallData, container) {
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
         <div>
           <div class="sr-rate" style="color:${rateColor}">${rate.toFixed(1)}%</div>
-          <div class="sr-sub">${fmt(contrib)} 投資 ÷ ${fmt(income)} 月収 &nbsp;·&nbsp; ${parseInt(mo)}月${yr}</div>
+          <div class="sr-sub">${fmt(contrib)} 投資 ÷ ${fmt(income)} 月収 &nbsp;·&nbsp; ${periodLabel}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">目標</div>
@@ -846,7 +848,7 @@ function buildMoMBlock(d, waterfallData) {
   const prevNW = d.totalNetWorth - last.total;
   const momPct = prevNW ? (last.total / prevNW * 100) : 0;
   const [yr, mo] = last.month.split('-');
-  const monthLabel = `${yr}年${parseInt(mo)}月`;
+  const monthLabel = last._mtd ? `${yr}年${parseInt(mo)}月 MTD` : `${yr}年${parseInt(mo)}月`;
   const totalColor = last.total >= 0 ? 'var(--green)' : 'var(--red)';
   const MC = { t1:'#58a6ff', t2:'#d29922', t3a:'#34d399', retPos:'#3fb950', retNeg:'#f85149', mort:'#bc8cff', re:'#f0883e' };
 
@@ -899,7 +901,7 @@ function buildMoMBlock(d, waterfallData) {
     <div class="ai-mom-header">
       <span class="ai-mom-month">${monthLabel}</span>
       <span class="ai-mom-total" style="color:${totalColor}">${last.total>=0?'+':''}${fmt(last.total)}</span>
-      <span class="ai-mom-pct">(${momPct>=0?'+':''}${momPct.toFixed(1)}% MoM)</span>
+      <span class="ai-mom-pct">(${momPct>=0?'+':''}${momPct.toFixed(1)}% ${last._mtd ? 'MTD' : 'MoM'})</span>
     </div>
     <div class="ai-mom-bar-track">${barSegs}</div>
     <div class="ai-mom-drivers">${driverRows}</div>
@@ -1136,6 +1138,10 @@ function renderFireBar(d, container) {
 // ── Monthly Waterfall ─────────────────────────────────────────────────────────
 function buildWaterfallData(history) {
   if (!history || history.length < 2) return [];
+  const finVal = r => (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
+  const costVal = r => (r.t1_index_cost||0)+(r.t2_cost||0)+(r.t3a_ideco_cost||0);
+  const reVal   = r => (r.t4_land||0)+(r.t4_building||0);
+
   // Last entry per calendar month
   const monthMap = new Map();
   for (const row of history) {
@@ -1143,10 +1149,22 @@ function buildWaterfallData(history) {
     monthMap.set(key, row);
   }
   const months = [...monthMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([k,r])=>({k,r}));
-  if (months.length < 2) return [];
-  const finVal = r => (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
-  const costVal = r => (r.t1_index_cost||0)+(r.t2_cost||0)+(r.t3a_ideco_cost||0);
-  const reVal   = r => (r.t4_land||0)+(r.t4_building||0);
+
+  // Only 1 calendar month recorded — synthesise MTD entry from first vs last history row
+  if (months.length < 2) {
+    const p = history[0], c = history[history.length - 1];
+    const t1Contrib  = (c.t1_index_cost||0)  - (p.t1_index_cost||0);
+    const t2Contrib  = (c.t2_cost||0)         - (p.t2_cost||0);
+    const t3aContrib = (c.t3a_ideco_cost||0)  - (p.t3a_ideco_cost||0);
+    const contrib        = t1Contrib + t2Contrib + t3aContrib;
+    const returns        = (finVal(c) - finVal(p)) - contrib;
+    const mortgagePaydown= -((c.t4_mortgage||0) - (p.t4_mortgage||0));
+    const reChange       = reVal(c) - reVal(p);
+    return [{ month: months[0].k, contrib, t1Contrib, t2Contrib, t3aContrib,
+              returns, mortgagePaydown, reChange,
+              total: contrib + returns + mortgagePaydown + reChange, _mtd: true }];
+  }
+
   const result = [];
   for (let i = 1; i < months.length; i++) {
     const p = months[i-1].r, c = months[i].r;
@@ -1212,7 +1230,7 @@ function renderWaterfallChart(history, container) {
     const [yr,mo]=d.month.split('-');
     const moNum=parseInt(mo);
     const showYear=i===0||mo==='01';
-    const label=showYear?`'${yr.slice(2)}/${moNum}月`:`${moNum}月`;
+    const label=d._mtd?`${moNum}月 MTD`:showYear?`'${yr.slice(2)}/${moNum}月`:`${moNum}月`;
     const isFirst=i===0, isLast=i===n-1;
     const anchor=isFirst?'start':isLast?'end':'middle';
     const lx=isFirst?Math.max(cx,PL+2):isLast?Math.min(cx,W-PR-2):cx;
@@ -1222,8 +1240,9 @@ function renderWaterfallChart(history, container) {
   const overlay=`<rect id="wfOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
   const hair=`<line id="wfHair" x1="0" y1="${PT}" x2="0" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
 
+  const isMtd = data.length===1 && data[0]._mtd;
   container.innerHTML=`<div class="wfall-card">
-    <h2 style="margin-top:0">月次 NW 変動内訳</h2>
+    <h2 style="margin-top:0">月次 NW 変動内訳${isMtd?' <span style="font-size:11px;font-weight:400;color:var(--muted)">(当月 MTD — 先月のデータが蓄積されると比較表示になります)</span>':''}</h2>
     <svg id="wfSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
       ${grid}${yLbl}${xLbl}${zeroLine}${bars}${hair}${overlay}
     </svg>
@@ -1257,7 +1276,7 @@ function renderWaterfallChart(history, container) {
     tipEl.style.top=Math.max(0,tipY-90)+'px';
     const pct=(v,tot)=>tot?` <span style="color:#6b7888;font-size:10px">(${Math.round(Math.abs(v)/Math.abs(tot)*100)}%)</span>`:'';
     const bkLine=(col,label,val,pctBase)=>val?`<div style="color:${col};margin-bottom:1px;padding-left:10px;font-size:11px">${label} ${fd(val)}${pct(val,pctBase)}</div>`:'';
-    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${yr}年${parseInt(mo)}月　合計 <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
+    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${yr}年${parseInt(mo)}月${pt._mtd?' MTD':''}　合計 <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
       (pt.contrib?`<div style="color:${C.t1};margin-bottom:1px">資金追加　　${fd(pt.contrib)}</div>`+
         bkLine(C.t1,  'T1 NISA  ', pt.t1Contrib,  pt.contrib)+
         bkLine(C.t2,  'T2 株式  ', pt.t2Contrib,  pt.contrib)+
