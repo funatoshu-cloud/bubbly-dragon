@@ -484,7 +484,9 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   const months=projData[projData.length-1].month;
   const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
   if(targetNW) allV.push(targetNW);
-  const minV=Math.min(...allV)*0.97, maxV=Math.max(...allV)*1.03;
+  const rawMin=Math.min(...allV), rawMax=Math.max(...allV);
+  const pad=(rawMax-rawMin)*0.04||Math.abs(rawMax||rawMin)*0.04||1e6;
+  const minV=rawMin-pad, maxV=rawMax+pad;
   const xs=m=>PL+(m/months)*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
 
   const line=(key,color,dash='')=>{
@@ -549,7 +551,9 @@ function setupChartInteraction(projData) {
   const cW=W-PL-PR, cH=H-PT-PB;
   const maxM=projData[projData.length-1].month;
   const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
-  const minV=Math.min(...allV)*0.97, maxV=Math.max(...allV)*1.03;
+  const rawMin=Math.min(...allV), rawMax=Math.max(...allV);
+  const pad=(rawMax-rawMin)*0.04||Math.abs(rawMax||rawMin)*0.04||1e6;
+  const minV=rawMin-pad, maxV=rawMax+pad;
   const xs=m=>PL+(m/maxM)*cW;
   const ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
 
