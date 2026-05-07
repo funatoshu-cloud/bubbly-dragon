@@ -1250,8 +1250,18 @@ function renderWaterfallChart(history, container) {
   const hair=`<line id="wfHair" x1="0" y1="${PT}" x2="0" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
 
   const isMtd = data.length===1 && data[0]._mtd;
+
+  // NW velocity — rolling average of recent monthly totals
+  const velSlice = data.slice(-3);
+  const velAvg = velSlice.length ? velSlice.reduce((s,m)=>s+m.total,0)/velSlice.length : 0;
+  const velColor = velAvg>=0 ? 'var(--green)' : 'var(--red)';
+  const velLbl = velSlice.length>=3 ? '過去3ヶ月平均' : `過去${velSlice.length}ヶ月平均`;
+
   container.innerHTML=`<div class="wfall-card">
-    <h2 style="margin-top:0">月次 NW 変動内訳${isMtd?' <span style="font-size:11px;font-weight:400;color:var(--muted)">(当月 MTD — 先月のデータが蓄積されると比較表示になります)</span>':''}</h2>
+    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <h2 style="margin:0">月次 NW 変動内訳${isMtd?' <span style="font-size:11px;font-weight:400;color:var(--muted)">(MTD)</span>':''}</h2>
+      <div style="margin-left:auto;font-size:12px;color:var(--muted)">増加ペース&ensp;<span style="color:${velColor};font-weight:700;font-variant-numeric:tabular-nums">${velAvg>=0?'+':''}${fmt(velAvg)}<span style="font-size:10px;font-weight:400">/月</span></span>&ensp;<span style="font-size:10px">(${velLbl})</span></div>
+    </div>
     <svg id="wfSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
       ${grid}${yLbl}${xLbl}${zeroLine}${bars}${hair}${overlay}
     </svg>
@@ -2171,7 +2181,7 @@ function render(d) {
         </div>
         <div class="top-metric">
           <div class="top-metric-title">全体損益</div>
-          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}</div>
+          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${d.netFinancialAssets>0?(d.totalGain/d.netFinancialAssets*100).toFixed(1):0}%)</span></div>
         </div>
         <div class="top-metric">
           <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
@@ -2231,39 +2241,51 @@ function render(d) {
 
     <!-- Asset Tiers -->
     <h2>資産 Tier</h2>
-    <div class="card" style="padding:0;overflow-x:auto;">
-      <table class="tier-table">
-        <thead><tr>
-          <th>Tier</th><th>カテゴリ</th><th>資産種別</th>
-          <th style="text-align:right">金額</th>
-          <th style="text-align:right">比率</th>
-          <th style="min-width:120px"></th>
-        </tr></thead>
-        <tbody>
-          ${d.tiers.map(t => `
-          <tr>
-            <td><span class="tier-badge ${t.color}">${t.id}</span></td>
-            <td>${t.desc}</td>
-            <td style="color:var(--muted);font-size:12px">${t.types}</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(t.amount)}</td>
-            <td style="text-align:right">${t.pctStr}</td>
-            <td>
-              <div class="pct-bar-wrap">
-                <div class="pct-bar" style="width:${t.pctNum}px;max-width:120px"></div>
-              </div>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colspan="3" style="font-weight:700">合計</td>
-            <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(d.totalNetWorth)}</td>
-            <td style="text-align:right">100%</td>
-            <td></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
+    ${(()=>{
+      const DC = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
+      const dtotal = d.tiers.reduce((s,t)=>s+Math.max(0,t.amount),0)||1;
+      const R=54,CX=70,CY=70,SW=24,C=2*Math.PI*R;
+      let segs='',doff=0;
+      for(const t of d.tiers){
+        const len=Math.max(0,t.amount)/dtotal*C;
+        if(len<0.5){doff+=len;continue;}
+        segs+=`<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${DC[t.id]||'#555'}" stroke-width="${SW}" stroke-linecap="butt" stroke-dasharray="${len.toFixed(2)} ${(C-len).toFixed(2)}" stroke-dashoffset="${(-doff+C/4).toFixed(2)}" transform="rotate(-90 ${CX} ${CY})"/>`;
+        doff+=len;
+      }
+      const donutLegend = d.tiers.map(t=>`<div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)"><span style="width:8px;height:8px;border-radius:2px;background:${DC[t.id]||'#555'};flex-shrink:0;display:inline-block"></span><span>${t.id}</span><span style="color:var(--text);font-variant-numeric:tabular-nums">${t.pctStr}</span></div>`).join('');
+      return `<div class="card" style="padding:0;display:flex;align-items:stretch;overflow:hidden">
+        <div style="overflow-x:auto;flex:1;min-width:0">
+          <table class="tier-table">
+            <thead><tr>
+              <th>Tier</th><th>カテゴリ</th><th>資産種別</th>
+              <th style="text-align:right">金額</th>
+            </tr></thead>
+            <tbody>
+              ${d.tiers.map(t=>`
+              <tr>
+                <td><span class="tier-badge ${t.color}">${t.id}</span></td>
+                <td>${t.desc}</td>
+                <td style="color:var(--muted);font-size:12px">${t.types}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(t.amount)}</td>
+              </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3" style="font-weight:700">合計</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(d.totalNetWorth)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div style="border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 20px;flex-shrink:0;gap:10px">
+          <svg viewBox="0 0 140 140" width="120" height="120" style="display:block">
+            <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${SW}"/>
+            ${segs}
+          </svg>
+          <div style="display:flex;flex-direction:column;gap:5px">${donutLegend}</div>
+        </div>
+      </div>`;
+    })()}
 
     <!-- Leverage & Real Estate -->
     ${(()=>{
