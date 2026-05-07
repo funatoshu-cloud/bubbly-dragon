@@ -115,6 +115,27 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 .sr-sub  { font-size:11px; color:var(--muted); margin-top:4px; }
 .sr-bar-track { height:4px; background:rgba(255,255,255,0.07); border-radius:2px; margin-top:12px; overflow:hidden; }
 .sr-bar-fill  { height:100%; border-radius:2px; transition:width .4s ease; }
+.sr-commitment-row { display:flex; align-items:center; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05); flex-wrap:wrap; }
+.sr-commitment-label { font-size:11px; color:var(--muted); }
+.sr-commitment-value { font-size:13px; font-weight:700; font-variant-numeric:tabular-nums; }
+.sr-commitment-note { font-size:10px; color:var(--muted); margin-left:auto; }
+
+/* MoM Snapshot */
+.ai-mom { background:var(--surface2); border-radius:6px; padding:10px 12px; margin-bottom:0; }
+.ai-mom-header { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; flex-wrap:wrap; }
+.ai-mom-month { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); }
+.ai-mom-total { font-size:18px; font-weight:700; font-variant-numeric:tabular-nums; }
+.ai-mom-pct { font-size:12px; color:var(--muted); }
+.ai-mom-bar-track { height:4px; background:rgba(255,255,255,0.06); border-radius:2px; margin-bottom:10px; overflow:hidden; display:flex; }
+.ai-mom-bar-seg { height:100%; }
+.ai-mom-drivers { display:flex; flex-direction:column; gap:3px; }
+.ai-mom-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+.ai-mom-row.sub { padding-left:16px; font-size:11px; }
+.ai-mom-dot { width:8px; height:8px; border-radius:2px; flex-shrink:0; }
+.ai-mom-name { flex:1; color:var(--muted); }
+.ai-mom-val { font-variant-numeric:tabular-nums; min-width:80px; text-align:right; }
+.ai-mom-pct-col { font-size:10px; color:var(--muted); min-width:36px; text-align:right; }
+.ai-mom-badge { font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; background:rgba(255,255,255,0.06); color:var(--muted); border:1px solid var(--border); flex-shrink:0; }
 
 /* AI Summary */
 .ai-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:10px; }
@@ -129,6 +150,21 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 .ai-ts { font-size:11px; color:var(--muted); }
 .ai-setup { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px 14px; font-size:12px; line-height:1.6; color:var(--muted); }
 .ai-setup code { background:rgba(255,255,255,0.06); border-radius:3px; padding:1px 5px; font-family:monospace; color:var(--text); font-size:11px; }
+/* AI feedback buttons */
+.ai-action-item { list-style:none; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.04); }
+.ai-action-item:last-child { border-bottom:none; }
+.ai-action-row { display:flex; align-items:flex-start; gap:10px; }
+.ai-action-text { flex:1; font-size:13px; line-height:1.5; }
+.ai-action-text.done { text-decoration:line-through; color:var(--green); opacity:0.75; }
+.ai-action-text.skip { text-decoration:line-through; color:var(--muted); opacity:0.6; }
+.ai-action-btns { display:flex; gap:4px; flex-shrink:0; padding-top:1px; }
+.ai-fb-btn { background:none; border:1px solid var(--border); border-radius:4px; color:var(--muted); font-size:11px; padding:2px 8px; cursor:pointer; transition:background .15s,color .15s,border-color .15s; }
+.ai-fb-btn:hover { border-color:rgba(255,255,255,0.2); color:var(--text); }
+.ai-fb-btn.active-done { background:rgba(63,185,80,0.15); border-color:var(--green); color:var(--green); }
+.ai-fb-btn.active-skip { background:rgba(255,255,255,0.06); border-color:var(--muted); color:var(--muted); }
+.ai-fb-btn.active-note { background:rgba(88,166,255,0.12); border-color:var(--blue); color:var(--blue); }
+.ai-note-area { margin-top:5px; }
+.ai-note-input { background:var(--surface2); border:1px solid var(--border); border-radius:4px; color:var(--text); padding:5px 8px; font-size:12px; width:100%; font-family:inherit; box-sizing:border-box; }
 
 /* FIRE progress bar */
 .fire-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:10px; }
@@ -246,6 +282,22 @@ input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
 .proj-table tfoot td { font-weight:700; border-top:1px solid var(--border); border-bottom:none; }
 .manual-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:8px; margin-bottom:14px; }
 .manual-card { background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+/* Rate assumptions table */
+.proj-rates-wrap { margin-bottom:14px; }
+.proj-rates-wrap summary { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); cursor:pointer; user-select:none; padding:2px 0 8px; list-style:none; display:flex; align-items:center; gap:8px; }
+.proj-rates-wrap summary::-webkit-details-marker { display:none; }
+.proj-rates-wrap summary::before { content:'›'; font-size:13px; transition:transform .15s; display:inline-block; }
+.proj-rates-wrap[open] summary::before { transform:rotate(90deg); }
+.proj-rates-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+.proj-rates-tbl th { text-align:right; padding:4px 10px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); border-bottom:1px solid var(--border); }
+.proj-rates-tbl th:first-child { text-align:left; }
+.proj-rates-tbl td { padding:6px 10px; border-bottom:1px solid rgba(255,255,255,0.04); text-align:right; font-variant-numeric:tabular-nums; color:var(--text); }
+.proj-rates-tbl td:first-child { text-align:left; color:var(--muted); }
+.proj-rates-tbl tr:last-child td { border-bottom:none; }
+.rate-badge { display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; vertical-align:middle; margin-left:5px; letter-spacing:.04em; }
+.rate-badge.ok  { background:rgba(63,185,80,.12); color:var(--green); border:1px solid rgba(63,185,80,.25); }
+.rate-badge.warn { background:rgba(210,153,34,.12); color:var(--yellow); border:1px solid rgba(210,153,34,.25); }
+.rate-badge.err  { background:rgba(248,81,73,.12);  color:var(--red);   border:1px solid rgba(248,81,73,.25); }
 .manual-card-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin-bottom:7px; }
 .manual-row { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
 .manual-row label { font-size:11px; color:var(--muted); width:58px; flex-shrink:0; }
@@ -352,22 +404,31 @@ function computeRates(history) {
     rates[key]={ annualBase:arrMedian(filt)*252, annualSigma:arrStddev(filt)*Math.sqrt(252), monthlyContrib:arrMedian(monthlyContribs)||0, currentValue:last[vCol]||0 };
   }
 
-  // T4 equity = land + building - mortgage (exclude 繰上げ返済 days)
+  // T4: separate property appreciation from mortgage paydown
   const mortDeltas=[];
   for (let i=1;i<history.length;i++) { const d=history[i].t4_mortgage-history[i-1].t4_mortgage; if(d<0) mortDeltas.push(Math.abs(d)); }
-  const typicalPmt=arrMedian(mortDeltas)||1;
+  let typicalPmt=arrMedian(mortDeltas)||0;
+  // Bootstrap monthly principal from amortization formula when no payment history yet
+  const last=history[history.length-1];
+  if (typicalPmt < 1000 && (last.t4_mortgage||0) > 0) {
+    const mr=MORTGAGE_RATE/12, n=MORTGAGE_TERM_YEARS*12, bal=last.t4_mortgage;
+    const fullPmt=bal*mr/(1-Math.pow(1+mr,-n));
+    typicalPmt=fullPmt-bal*mr; // principal portion only
+  }
+  // Rate = property appreciation only (Δ(land+building)/(land+building)) — never mix in paydown
   const t4Returns=[];
   for (let i=1;i<history.length;i++) {
     const p=history[i-1],c=history[i];
-    if([p.t4_land,p.t4_building,p.t4_mortgage,c.t4_land,c.t4_building,c.t4_mortgage].some(v=>v===null)) continue;
-    if(Math.abs(c.t4_mortgage-p.t4_mortgage)>2*typicalPmt) continue; // skip 繰上げ返済
-    const eq0=p.t4_land+p.t4_building-p.t4_mortgage, eq1=c.t4_land+c.t4_building-c.t4_mortgage;
-    if(eq0>0 && eq0!==eq1) t4Returns.push((eq1-eq0)/eq0);
+    if([p.t4_land,p.t4_building,c.t4_land,c.t4_building].some(v=>v===null)) continue;
+    const prop0=p.t4_land+p.t4_building, prop1=c.t4_land+c.t4_building;
+    if(prop0>0 && prop0!==prop1) t4Returns.push((prop1-prop0)/prop0);
   }
   const t4Med=arrMedian(t4Returns), t4Sd=arrStddev(t4Returns);
   const t4Filt=t4Returns.filter(r=>Math.abs(r-t4Med)<=3*t4Sd);
-  const last=history[history.length-1];
-  rates.t4={ annualBase:arrMedian(t4Filt)*365, annualSigma:arrStddev(t4Filt)*Math.sqrt(365), monthlyContrib:0, currentValue:(last.t4_land||0)+(last.t4_building||0)-(last.t4_mortgage||0), _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt };
+  // Paydown starts June 1 2026; offset = months from today (clamped ≥ 0)
+  const _paydownStartOffset=Math.max(0,Math.round((new Date('2026-06-01')-new Date())/(1000*60*60*24*30.44)));
+  const _propValue=(last.t4_land||0)+(last.t4_building||0);
+  rates.t4={ annualBase:arrMedian(t4Filt)*365||0, annualSigma:arrStddev(t4Filt)*Math.sqrt(365)||0, monthlyContrib:typicalPmt, currentValue:_propValue-(last.t4_mortgage||0), _propertyValue:_propValue, _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt, _paydownStartOffset };
 
   // Monthly buckets: simple ΔV/V
   for (const [key,col] of [['t0','t0_value'],['t1_hysa','t1_hysa'],['t1_gold','t1_gold'],['t3a_insurance','t3a_insurance'],['t3b','t3b_value']]) {
@@ -396,6 +457,16 @@ function buildProjection(rates, months, stopMonths) {
       if(r._isLinearPaydown){
         const fv=Math.min(0, r.currentValue + m * r._monthlyPaydown);
         base+=fv; opt+=fv; pess+=fv; continue;
+      }
+      // T4: split property appreciation (compounding on full property value) from
+      // mortgage paydown (fixed monthly principal, linear, starting _paydownStartOffset)
+      if(key==='t4' && r._propertyValue!==undefined){
+        const payMo=Math.max(0, m-(r._paydownStartOffset||0));
+        const mortFV=Math.max(0, r._mortgageBalance - r.monthlyContrib*payMo);
+        base+=projectBucket(r._propertyValue,0,r.annualBase,              m)-mortFV;
+        opt +=projectBucket(r._propertyValue,0,r.annualBase+r.annualSigma,m)-mortFV;
+        pess+=projectBucket(r._propertyValue,0,r.annualBase-r.annualSigma,m)-mortFV;
+        continue;
       }
       const contrib = (m <= stopMonths) ? r.monthlyContrib : 0;
       base +=projectBucket(r.currentValue,contrib,r.annualBase,m);
@@ -569,16 +640,32 @@ function renderSavingsRate(d, waterfallData, container) {
 
   if (!income) {
     container.innerHTML = `<h2>月次貯蓄率</h2>
-      <div class="sr-card" style="color:var(--muted);font-size:12px">
-        月収を data clean シートの <strong>AA24</strong> に入力してください
+      <div class="sr-card">
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">
+          月収が未設定です。Google スプレッドシートの <strong style="color:var(--text)">data clean シート AA24</strong> に月収（手取り）を入力してください。
+        </div>
       </div>`;
     return;
   }
 
   const rate = contrib / income * 100;
-  const barPct = Math.min(rate, 50) / 50 * 100; // cap bar at 50% = full
-  const rateColor = rate >= 30 ? 'var(--green)' : rate >= 20 ? 'var(--yellow)' : 'var(--red)';
+  const barPct = Math.min(rate, 40) / 40 * 100; // cap bar at 40% = full width
+  const rateColor = rate >= 25 ? 'var(--green)' : rate >= 15 ? 'var(--yellow)' : 'var(--red)';
   const [yr, mo] = last.month.split('-');
+
+  // Wife's mortgage support — temporary ¥90K/mo through March 2027
+  const WIFE_MORTGAGE = 90000;
+  const showWifeMortgage = new Date() < new Date('2027-04-01');
+  const totalCommitment = contrib + (showWifeMortgage ? WIFE_MORTGAGE : 0);
+  const totalRate = totalCommitment / income * 100;
+  const totalColor = totalRate >= 25 ? 'var(--green)' : totalRate >= 15 ? 'var(--yellow)' : 'var(--red)';
+
+  const wifeRow = showWifeMortgage ? `
+    <div class="sr-commitment-row">
+      <span class="sr-commitment-label">妻ローン負担込み</span>
+      <span class="sr-commitment-value" style="color:${totalColor}">${totalRate.toFixed(1)}%</span>
+      <span class="sr-commitment-note">+¥90K/mo · through Mar 2027</span>
+    </div>` : '';
 
   container.innerHTML = `<h2>月次貯蓄率</h2>
     <div class="sr-card">
@@ -589,12 +676,13 @@ function renderSavingsRate(d, waterfallData, container) {
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">目標</div>
-          <div style="font-size:14px;font-weight:700;color:var(--muted)">30%</div>
+          <div style="font-size:14px;font-weight:700;color:var(--muted)">25%</div>
         </div>
       </div>
       <div class="sr-bar-track">
         <div class="sr-bar-fill" style="width:${barPct.toFixed(1)}%;background:${rateColor}"></div>
       </div>
+      ${wifeRow}
     </div>`;
 }
 
@@ -602,28 +690,255 @@ function renderSavingsRate(d, waterfallData, container) {
 function mdToHtml(text) {
   if (!text) return '';
   const lines = text.split('\n');
-  let html = '', inList = false;
+  let html = '', inList = false, inActionList = false, actionIdx = 0, inSection4 = false;
   for (let raw of lines) {
     let line = raw
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
       .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
       .replace(/\*(.+?)\*/g,'<em>$1</em>');
     if (/^###\s+/.test(line)) {
+      if (inActionList) { html += '</ul>'; inActionList = false; }
       if (inList) { html += '</ul>'; inList = false; }
-      html += `<div class="ai-section-head">${line.replace(/^###\s+/,'')}</div>`;
+      const headText = line.replace(/^###\s+/,'');
+      // Detect section 4 (Priority Actions)
+      inSection4 = /^4[.\s]/.test(headText);
+      if (inSection4) actionIdx = 0;
+      html += `<div class="ai-section-head">${headText}</div>`;
     } else if (/^[-*]\s+/.test(line)) {
-      if (!inList) { html += '<ul class="ai-list">'; inList = true; }
-      html += `<li>${line.replace(/^[-*]\s+/,'')}</li>`;
+      const itemText = line.replace(/^[-*]\s+/,'');
+      if (inSection4) {
+        // Action item with feedback buttons
+        if (!inActionList) { html += '<ul class="ai-list" id="aiActionList">'; inActionList = true; }
+        html += `<li class="ai-action-item" data-id="${actionIdx}">` +
+          `<div class="ai-action-row">` +
+          `<span class="ai-action-text">${itemText}</span>` +
+          `<span class="ai-action-btns">` +
+          `<button class="ai-fb-btn" data-fb="done" title="Mark done">✓</button>` +
+          `<button class="ai-fb-btn" data-fb="skip" title="Skip">✗</button>` +
+          `<button class="ai-fb-btn" data-fb="note" title="Add note">+</button>` +
+          `</span></div>` +
+          `<div class="ai-note-area" style="display:none"><input class="ai-note-input" placeholder="Add context…"></div>` +
+          `</li>`;
+        actionIdx++;
+      } else {
+        if (inActionList) { html += '</ul>'; inActionList = false; }
+        if (!inList) { html += '<ul class="ai-list">'; inList = true; }
+        html += `<li>${itemText}</li>`;
+      }
     } else if (line.trim() === '') {
+      if (inActionList) { html += '</ul>'; inActionList = false; }
       if (inList) { html += '</ul>'; inList = false; }
       html += '<div style="height:6px"></div>';
     } else {
+      if (inActionList) { html += '</ul>'; inActionList = false; }
       if (inList) { html += '</ul>'; inList = false; }
       html += `<p class="ai-para">${line}</p>`;
     }
   }
+  if (inActionList) html += '</ul>';
   if (inList) html += '</ul>';
   return html;
+}
+
+function initAIFeedback(summaryId) {
+  const list = document.getElementById('aiActionList');
+  if (!list) return;
+  // Load saved feedback
+  let saved = {};
+  try {
+    const raw = localStorage.getItem('wt_ai_feedback');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.summaryId === summaryId) {
+        (parsed.items || []).forEach(item => { saved[item.id] = item; });
+      }
+    }
+  } catch(_) {}
+
+  function saveFeedback() {
+    const items = [];
+    list.querySelectorAll('.ai-action-item').forEach(li => {
+      const id = +li.dataset.id;
+      const textEl = li.querySelector('.ai-action-text');
+      const noteEl = li.querySelector('.ai-note-input');
+      const doneBtnActive = li.querySelector('[data-fb="done"]').classList.contains('active-done');
+      const skipBtnActive = li.querySelector('[data-fb="skip"]').classList.contains('active-skip');
+      const status = doneBtnActive ? 'done' : skipBtnActive ? 'skip' : '';
+      const note = noteEl ? noteEl.value.trim() : '';
+      if (status || note) items.push({ id, text: textEl.textContent.trim(), status, note });
+    });
+    localStorage.setItem('wt_ai_feedback', JSON.stringify({ summaryId, items }));
+  }
+
+  function applyState(li, status, note) {
+    const textEl = li.querySelector('.ai-action-text');
+    const doneBtn = li.querySelector('[data-fb="done"]');
+    const skipBtn = li.querySelector('[data-fb="skip"]');
+    const noteBtn = li.querySelector('[data-fb="note"]');
+    const noteArea = li.querySelector('.ai-note-area');
+    const noteInput = li.querySelector('.ai-note-input');
+    textEl.className = 'ai-action-text' + (status ? ' ' + status : '');
+    doneBtn.className = 'ai-fb-btn' + (status === 'done' ? ' active-done' : '');
+    skipBtn.className = 'ai-fb-btn' + (status === 'skip' ? ' active-skip' : '');
+    noteBtn.className = 'ai-fb-btn' + (note ? ' active-note' : '');
+    if (note && noteInput) { noteInput.value = note; noteArea.style.display = 'block'; }
+  }
+
+  // Apply saved states
+  list.querySelectorAll('.ai-action-item').forEach(li => {
+    const id = +li.dataset.id;
+    if (saved[id]) applyState(li, saved[id].status, saved[id].note || '');
+  });
+
+  // Attach handlers
+  list.addEventListener('click', e => {
+    const btn = e.target.closest('.ai-fb-btn');
+    if (!btn) return;
+    const li = btn.closest('.ai-action-item');
+    const fb = btn.dataset.fb;
+    const textEl = li.querySelector('.ai-action-text');
+    const doneBtn = li.querySelector('[data-fb="done"]');
+    const skipBtn = li.querySelector('[data-fb="skip"]');
+    const noteBtn = li.querySelector('[data-fb="note"]');
+    const noteArea = li.querySelector('.ai-note-area');
+    const noteInput = li.querySelector('.ai-note-input');
+    if (fb === 'done') {
+      const wasActive = doneBtn.classList.contains('active-done');
+      applyState(li, wasActive ? '' : 'done', noteInput ? noteInput.value.trim() : '');
+    } else if (fb === 'skip') {
+      const wasActive = skipBtn.classList.contains('active-skip');
+      applyState(li, wasActive ? '' : 'skip', noteInput ? noteInput.value.trim() : '');
+    } else if (fb === 'note') {
+      const open = noteArea.style.display !== 'none';
+      noteArea.style.display = open ? 'none' : 'block';
+      if (!open) noteInput.focus();
+    }
+    saveFeedback();
+  });
+
+  list.querySelectorAll('.ai-note-input').forEach(input => {
+    input.addEventListener('blur', () => saveFeedback());
+  });
+}
+
+function buildFeedbackParam() {
+  try {
+    const raw = localStorage.getItem('wt_ai_feedback');
+    if (!raw) return '';
+    const parsed = JSON.parse(raw);
+    if (!parsed.items || !parsed.items.length) return '';
+    const lines = ['Previous action feedback:'];
+    parsed.items.forEach(item => {
+      let line = `- "${item.text}"`;
+      if (item.status === 'done') line += ' → DONE';
+      else if (item.status === 'skip') line += ' → SKIPPED';
+      if (item.note) line += ` (note: "${item.note}")`;
+      lines.push(line);
+    });
+    return btoa(unescape(encodeURIComponent(lines.join('\n'))));
+  } catch(_) { return ''; }
+}
+
+function buildMoMBlock(d, waterfallData) {
+  if (!waterfallData || !waterfallData.length) return '';
+  const last = waterfallData[waterfallData.length - 1];
+  if (!last.total && !last.contrib && !last.returns && !last.mortgagePaydown && !last.reChange) return '';
+  const prevNW = d.totalNetWorth - last.total;
+  const momPct = prevNW ? (last.total / prevNW * 100) : 0;
+  const [yr, mo] = last.month.split('-');
+  const monthLabel = `${yr}年${parseInt(mo)}月`;
+  const totalColor = last.total >= 0 ? 'var(--green)' : 'var(--red)';
+  const MC = { t1:'#58a6ff', t2:'#d29922', t3a:'#34d399', retPos:'#3fb950', retNeg:'#f85149', mort:'#bc8cff', re:'#f0883e' };
+
+  // Drivers — filter zero, track key for biggest
+  const allDrivers = [
+    { key:'contrib', label:'資金追加', val:last.contrib,         color:MC.t1,
+      subs: (last.contrib > 0 && (last.t2Contrib || last.t3aContrib))
+        ? [{ label:'T1 NISA', val:last.t1Contrib, color:MC.t1 },
+           { label:'T2 株式', val:last.t2Contrib, color:MC.t2 },
+           { label:'T3a iDeCo', val:last.t3aContrib, color:MC.t3a }].filter(s => s.val)
+        : [] },
+    { key:'returns', label:'運用損益',   val:last.returns,         color:last.returns >= 0 ? MC.retPos : MC.retNeg, subs:[] },
+    { key:'mort',    label:'ローン返済', val:last.mortgagePaydown, color:MC.mort, subs:[] },
+    { key:'re',      label:'不動産変動', val:last.reChange,        color:MC.re,   subs:[] },
+  ].filter(dr => dr.val !== 0);
+
+  if (!allDrivers.length) return '';
+  const biggest = allDrivers.reduce((a, b) => Math.abs(b.val) > Math.abs(a.val) ? b : a);
+
+  // Mini stacked bar — positive drivers only
+  const posSum = allDrivers.filter(dr => dr.val > 0).reduce((s, dr) => s + dr.val, 0) || 1;
+  const barSegs = allDrivers.filter(dr => dr.val > 0)
+    .map(dr => `<div class="ai-mom-bar-seg" style="width:${(dr.val/posSum*100).toFixed(1)}%;background:${dr.color}"></div>`)
+    .join('');
+
+  // Driver rows
+  const driverRows = allDrivers.map(dr => {
+    const pct = last.total ? Math.round(Math.abs(dr.val) / Math.abs(last.total) * 100) : 0;
+    const badge = dr.key === biggest.key ? `<span class="ai-mom-badge">最大</span>` : '';
+    const valColor = dr.val >= 0 ? 'var(--green)' : 'var(--red)';
+    const mainRow = `<div class="ai-mom-row">
+      <div class="ai-mom-dot" style="background:${dr.color}"></div>
+      <span class="ai-mom-name">${dr.label}</span>${badge}
+      <span class="ai-mom-val" style="color:${valColor}">${dr.val>=0?'+':''}${fmt(dr.val)}</span>
+      <span class="ai-mom-pct-col">${pct}%</span>
+    </div>`;
+    const subRows = (dr.subs||[]).map(s => {
+      const sp = last.contrib ? Math.round(s.val / last.contrib * 100) : 0;
+      return `<div class="ai-mom-row sub">
+        <div class="ai-mom-dot" style="background:${s.color}"></div>
+        <span class="ai-mom-name">${s.label}</span>
+        <span class="ai-mom-val" style="color:var(--muted)">+${fmt(s.val)}</span>
+        <span class="ai-mom-pct-col">${sp}%</span>
+      </div>`;
+    }).join('');
+    return mainRow + subRows;
+  }).join('');
+
+  return `<div class="ai-mom">
+    <div class="ai-mom-header">
+      <span class="ai-mom-month">${monthLabel}</span>
+      <span class="ai-mom-total" style="color:${totalColor}">${last.total>=0?'+':''}${fmt(last.total)}</span>
+      <span class="ai-mom-pct">(${momPct>=0?'+':''}${momPct.toFixed(1)}% MoM)</span>
+    </div>
+    <div class="ai-mom-bar-track">${barSegs}</div>
+    <div class="ai-mom-drivers">${driverRows}</div>
+  </div>`;
+}
+
+function renderMoMSnapshot(d, waterfallData, container) {
+  if (!container) return;
+  const block = buildMoMBlock(d, waterfallData);
+  if (!block) { container.innerHTML = ''; return; }
+  container.innerHTML = `<h2>月次変動内訳</h2><div class="card" style="padding:12px 14px;margin-bottom:10px">${block}</div>`;
+}
+
+function buildMoMParam(waterfallData) {
+  if (!waterfallData || !waterfallData.length) return '';
+  try {
+    const last = waterfallData[waterfallData.length - 1];
+    const [yr, mo] = last.month.split('-');
+    const fd = v => (v >= 0 ? '+' : '') + '¥' + Math.abs(Math.round(v)).toLocaleString();
+    const pct = (v, tot) => tot ? ` (${Math.round(Math.abs(v) / Math.abs(tot) * 100)}% of change)` : '';
+    const drivers = [
+      ['Contributions', last.contrib],
+      ['Investment returns', last.returns],
+      ['Mortgage paydown', last.mortgagePaydown],
+      ['Real estate change', last.reChange],
+    ].filter(([, v]) => v !== 0);
+    if (!drivers.length) return '';
+    const biggest = drivers.reduce((a, b) => Math.abs(b[1]) > Math.abs(a[1]) ? b : a);
+    const lines = [
+      `Month-over-month NW snapshot (${yr}-${mo}):`,
+      `Total NW change: ${fd(last.total)}`,
+      ...drivers.map(([label, val]) => `  ${label}: ${fd(val)}${pct(val, last.total)}`),
+      `Biggest driver this month: ${biggest[0]} at ${fd(biggest[1])}`,
+    ];
+    if (last.t1Contrib || last.t2Contrib || last.t3aContrib) {
+      lines.push(`  Contribution breakdown: T1 NISA ${fd(last.t1Contrib)}, T2 ${fd(last.t2Contrib)}, T3a iDeCo ${fd(last.t3aContrib)}`);
+    }
+    return btoa(unescape(encodeURIComponent(lines.join('\n'))));
+  } catch(_) { return ''; }
 }
 
 function renderAISummary(d, waterfallData, container) {
@@ -685,6 +1000,9 @@ function renderAISummary(d, waterfallData, container) {
       regenerateSummary(d, waterfallData);
     });
   }
+
+  // Wire up action feedback buttons (section 4 bullets)
+  if (summary) initAIFeedback(d.aiSummaryDate || '');
 }
 
 function buildSummaryPayload(d, waterfallData) {
@@ -727,11 +1045,19 @@ async function regenerateSummary(d, waterfallData) {
   btn.disabled = true;
   setMsg('<span class="ai-placeholder">Triggering Gemini — reloading in 20 seconds…</span>');
 
+  // Build URL params: feedback (fb) + MoM snapshot (mom)
+  const fb  = buildFeedbackParam();
+  const mom = buildMoMParam(waterfallData);
+  const params = [];
+  if (fb)  params.push('fb='  + encodeURIComponent(fb));
+  if (mom) params.push('mom=' + encodeURIComponent(mom));
+  const url = d.scriptUrl + (params.length ? '?' + params.join('&') : '');
+
   // Simple GET with no-cors — no body, no preflight, no redirect issues.
   // Apps Script reads all metrics directly from the sheet, so no data needed here.
   // We can't read the opaque response; instead we reload the sheet after a delay
   // to pick up the summary written to AB21/AB22 by the script.
-  fetch(d.scriptUrl, { mode: 'no-cors' }).catch(() => {});
+  fetch(url, { mode: 'no-cors' }).catch(() => {});
 
   let secs = 20;
   const tick = setInterval(() => {
@@ -741,6 +1067,8 @@ async function regenerateSummary(d, waterfallData) {
     } else {
       clearInterval(tick);
       setMsg('<span class="ai-placeholder">Reloading data…</span>');
+      // Clear feedback — it's been sent to the prompt, fresh start after reload
+      localStorage.removeItem('wt_ai_feedback');
       loadAndRender();
     }
   }, 1000);
@@ -822,11 +1150,15 @@ function buildWaterfallData(history) {
   const result = [];
   for (let i = 1; i < months.length; i++) {
     const p = months[i-1].r, c = months[i].r;
-    const contrib        = costVal(c) - costVal(p);
+    const t1Contrib  = (c.t1_index_cost||0)  - (p.t1_index_cost||0);
+    const t2Contrib  = (c.t2_cost||0)         - (p.t2_cost||0);
+    const t3aContrib = (c.t3a_ideco_cost||0)  - (p.t3a_ideco_cost||0);
+    const contrib        = t1Contrib + t2Contrib + t3aContrib;
     const returns        = (finVal(c) - finVal(p)) - contrib;
     const mortgagePaydown= -((c.t4_mortgage||0) - (p.t4_mortgage||0));
     const reChange       = reVal(c) - reVal(p);
-    result.push({ month: months[i].k, contrib, returns, mortgagePaydown, reChange,
+    result.push({ month: months[i].k, contrib, t1Contrib, t2Contrib, t3aContrib,
+                  returns, mortgagePaydown, reChange,
                   total: contrib + returns + mortgagePaydown + reChange });
   }
   return result.slice(-12);
@@ -838,7 +1170,7 @@ function renderWaterfallChart(history, container) {
 
   const W=800,H=210,PL=68,PR=20,PT=14,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB, n=data.length;
-  const C = { contrib:'#58a6ff', retPos:'#3fb950', retNeg:'#f85149', mortgage:'#bc8cff', rePos:'#f0883e', reNeg:'#d29922' };
+  const C = { contrib:'#58a6ff', t1:'#58a6ff', t2:'#d29922', t3a:'#34d399', retPos:'#3fb950', retNeg:'#f85149', mortgage:'#bc8cff', rePos:'#f0883e', reNeg:'#e8773c' };
 
   // Scale
   const allPosMax = Math.max(0,...data.map(d=>[d.contrib,d.returns,d.mortgagePaydown,d.reChange].filter(v=>v>0).reduce((s,v)=>s+v,0)));
@@ -863,8 +1195,11 @@ function renderWaterfallChart(history, container) {
   let bars='', xLbl='';
   data.forEach((d,i)=>{
     const cx=xs(i), x=(cx-barW/2).toFixed(1), bw=barW.toFixed(1);
+    // Contributions split into T1/T2/T3a sub-segments, then returns, mortgage, RE
     const drivers=[
-      {val:d.contrib,        posC:C.contrib,  negC:C.contrib},
+      {val:d.t1Contrib,      posC:C.t1,       negC:C.t1},
+      {val:d.t2Contrib,      posC:C.t2,       negC:C.t2},
+      {val:d.t3aContrib,     posC:C.t3a,      negC:C.t3a},
       {val:d.returns,        posC:C.retPos,   negC:C.retNeg},
       {val:d.mortgagePaydown,posC:C.mortgage, negC:C.mortgage},
       {val:d.reChange,       posC:C.rePos,    negC:C.reNeg},
@@ -893,7 +1228,9 @@ function renderWaterfallChart(history, container) {
       ${grid}${yLbl}${xLbl}${zeroLine}${bars}${hair}${overlay}
     </svg>
     <div class="wfall-legend">
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.contrib}"></div>資金追加</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t1}"></div>T1 NISA</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t2}"></div>T2 株式</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t3a}"></div>T3a iDeCo</div>
       <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retPos}"></div>運用益</div>
       <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retNeg}"></div>運用損</div>
       <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.mortgage}"></div>ローン返済</div>
@@ -918,9 +1255,14 @@ function renderWaterfallChart(history, container) {
     const tipX=e.clientX-rect.left, tipY=e.clientY-rect.top, flip=tipX>rect.width*0.6;
     tipEl.style.left=flip?'auto':(tipX+12)+'px'; tipEl.style.right=flip?(rect.width-tipX+12)+'px':'auto';
     tipEl.style.top=Math.max(0,tipY-90)+'px';
+    const pct=(v,tot)=>tot?` <span style="color:#6b7888;font-size:10px">(${Math.round(Math.abs(v)/Math.abs(tot)*100)}%)</span>`:'';
+    const bkLine=(col,label,val,pctBase)=>val?`<div style="color:${col};margin-bottom:1px;padding-left:10px;font-size:11px">${label} ${fd(val)}${pct(val,pctBase)}</div>`:'';
     tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${yr}年${parseInt(mo)}月　合計 <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
-      `<div style="color:${C.contrib};margin-bottom:2px">資金追加　　${fd(pt.contrib)}</div>`+
-      `<div style="color:${pt.returns>=0?C.retPos:C.retNeg};margin-bottom:2px">運用損益　　${fd(pt.returns)}</div>`+
+      (pt.contrib?`<div style="color:${C.t1};margin-bottom:1px">資金追加　　${fd(pt.contrib)}</div>`+
+        bkLine(C.t1,  'T1 NISA  ', pt.t1Contrib,  pt.contrib)+
+        bkLine(C.t2,  'T2 株式  ', pt.t2Contrib,  pt.contrib)+
+        bkLine(C.t3a, 'T3a iDeCo', pt.t3aContrib, pt.contrib):'')+
+      `<div style="color:${pt.returns>=0?C.retPos:C.retNeg};margin-bottom:2px;margin-top:${pt.contrib?'4':'0'}px">運用損益　　${fd(pt.returns)}</div>`+
       `<div style="color:${C.mortgage};margin-bottom:2px">ローン返済　${fd(pt.mortgagePaydown)}</div>`+
       (Math.abs(pt.reChange)>1000?`<div style="color:${C.rePos}">不動産変動　${fd(pt.reChange)}</div>`:'');
     tipEl.style.display='block';
@@ -1202,7 +1544,7 @@ function renderProjection(d, history) {
   const el=document.getElementById('projection'); if(!el) return;
   const histDays=history.length;
   const canAuto=histDays>=30;
-  const rates=canAuto?computeRates(history):null;
+  const rates=history.length>=2?computeRates(history):null; // always compute for display; canAuto gates projection quality
 
   const BUCKET_LABELS={t1_index:'T1 Index funds',t2:'T2 Stocks',t3a_ideco:'T3(a) iDeCo',t4:'T4 Real estate equity',t0:'T0 Cash',t1_hysa:'T1 HYSA',t1_gold:'T1 Gold',t3a_insurance:'T3(a) Insurance',t3b:'T3(b) 529'};
   const HAS_CONTRIB=['t1_index','t2','t3a_ideco'];
@@ -1219,6 +1561,51 @@ function renderProjection(d, history) {
     ?`<div class="proj-warning red">Not enough data (${histDays} day${histDays!==1?'s':''} recorded) — enter rates manually to preview a projection, or wait until 30 days have been captured.</div>`
     :histDays<365
     ?`<div class="proj-warning yellow">Limited data (${histDays} days) — estimates may not reflect full annual contribution patterns.</div>`:'';
+
+  // Rate assumptions table
+  const dataBadge = histDays>=365
+    ? `<span class="rate-badge ok">${histDays}d</span>`
+    : histDays>=30
+    ? `<span class="rate-badge warn">⚠ ${histDays}d</span>`
+    : `<span class="rate-badge err">⚠ ${histDays}d — insufficient</span>`;
+
+  const rateRows = Object.entries(BUCKET_LABELS).map(([key, label]) => {
+    const r = rates && rates[key];
+    const cv = r ? r.currentValue : currentFromHistory(key);
+    if (!cv && key !== 't4') return ''; // skip empty buckets except T4
+    const base = r ? r.annualBase : null;
+    const sigma = r ? r.annualSigma : null;
+    const baseStr = base !== null
+      ? `<span style="color:${base>=0?'var(--green)':'var(--red)'}">${base>=0?'+':''}${(base*100).toFixed(1)}%</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    const sigmaStr = sigma !== null && sigma > 0
+      ? `<span style="color:var(--muted)">±${(sigma*100).toFixed(1)}%</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    let contribCell = '—';
+    if (key === 't4' && r) {
+      const payoff = r._paydownStartOffset > 0
+        ? `<span style="font-size:10px;color:var(--muted)">from Jun 2026</span>`
+        : '';
+      contribCell = r.monthlyContrib > 0
+        ? `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}/mo</span> ${payoff}`
+        : `<span style="color:var(--muted)">—</span>`;
+    } else if (r && r.monthlyContrib > 0) {
+      contribCell = `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}/mo</span>`;
+    }
+    return `<tr><td>${label}</td><td>${baseStr}</td><td>${sigmaStr}</td><td>${contribCell}</td></tr>`;
+  }).join('');
+
+  const rateTableHtml = `
+  <details class="proj-rates-wrap">
+    <summary>Rate assumptions ${dataBadge}</summary>
+    <div class="card" style="padding:0;overflow-x:auto">
+      <table class="proj-rates-tbl">
+        <thead><tr><th style="text-align:left">Bucket</th><th>Ann. return</th><th>±σ / yr</th><th style="text-align:left">Monthly contrib</th></tr></thead>
+        <tbody>${rateRows}</tbody>
+      </table>
+    </div>
+    ${histDays<30?`<div style="font-size:11px;color:var(--red);margin-top:6px">⚠ Rates shown are estimated from ${histDays} day${histDays!==1?'s':''} of data and are not reliable. Use manual mode for meaningful projections.</div>`:''}
+  </details>`;
 
   const manualCardsHtml=Object.entries(BUCKET_LABELS).map(([key,label])=>{
     const r=rates&&rates[key];
@@ -1265,6 +1652,7 @@ function renderProjection(d, history) {
       </div>
     </div>
     <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
+    ${rateTableHtml}
     <div id="pLegend" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--muted);padding:2px 0;letter-spacing:.02em">
       <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>Optimistic</span>
       <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>Base</span>
@@ -1312,7 +1700,11 @@ function renderProjection(d, history) {
         if(rc) monthlyContrib=parseFloat(rc.value)||0;
         annualSigma=0;
       }
-      pr[key]={annualBase,annualSigma,monthlyContrib,currentValue:cv};
+      pr[key]={annualBase,annualSigma,monthlyContrib,currentValue:cv,
+               // carry T4-specific paydown metadata for the split projection formula
+               _propertyValue:r?r._propertyValue:undefined,
+               _mortgageBalance:r?r._mortgageBalance:undefined,
+               _paydownStartOffset:r?r._paydownStartOffset:undefined};
     }
 
     // RE exclusion: replace T4 equity with mortgage-as-liability (linear paydown)
@@ -1382,8 +1774,20 @@ function renderProjection(d, history) {
     let totalCur=0,totalProj=0,totalCap=0,totalRet=0;
     document.getElementById('pTbody').innerHTML=Object.entries(BUCKET_LABELS).map(([key,label])=>{
       const r=pr[key]; if(!r||r.currentValue===0) return '';
-      const proj=r._isLinearPaydown?Math.min(0,r.currentValue+months*r._monthlyPaydown):projectBucket(r.currentValue,r.monthlyContrib,r.annualBase,months);
-      const cap=r._isLinearPaydown?0:r.monthlyContrib*Math.min(months,stopMonths), ret=proj-r.currentValue-cap;
+      let proj, cap;
+      if (r._isLinearPaydown) {
+        proj = Math.min(0, r.currentValue + months * r._monthlyPaydown);
+        cap  = 0;
+      } else if (key==='t4' && r._propertyValue!==undefined) {
+        const payMo = Math.max(0, months - (r._paydownStartOffset||0));
+        const mortFV = Math.max(0, r._mortgageBalance - r.monthlyContrib * payMo);
+        proj = projectBucket(r._propertyValue, 0, r.annualBase, months) - mortFV;
+        cap  = r.monthlyContrib * payMo; // total principal paid over period
+      } else {
+        proj = projectBucket(r.currentValue, r.monthlyContrib, r.annualBase, months);
+        cap  = r.monthlyContrib * Math.min(months, stopMonths);
+      }
+      const ret=proj-r.currentValue-cap;
       totalCur+=r.currentValue; totalProj+=proj; totalCap+=cap; totalRet+=ret;
       const rowLabel=excludeRE&&key==='t4'?'T4 Mortgage (liability)':label;
       return `<tr><td>${rowLabel}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">${cap?'+'+fmt(cap):'—'}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${r._isLinearPaydown?'linear paydown':(r.annualBase*100).toFixed(1)+'%'}</td></tr>`;
@@ -1756,6 +2160,9 @@ function render(d) {
       <!-- Savings rate -->
       <div id="savingsRateContainer"></div>
 
+      <!-- MoM snapshot (above AI summary) -->
+      <div id="aiMomContainer"></div>
+
       <!-- AI Summary -->
       <div id="aiSummaryContainer"></div>
 
@@ -1932,6 +2339,7 @@ function render(d) {
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   const _waterfallData = buildWaterfallData(_history);
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
+  renderMoMSnapshot(d, _waterfallData, document.getElementById('aiMomContainer'));
   renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
   renderMortgageSimulator(d, document.getElementById('mortgageSimContainer'));
