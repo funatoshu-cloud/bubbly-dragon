@@ -2181,7 +2181,7 @@ function render(d) {
         </div>
         <div class="top-metric">
           <div class="top-metric-title">全体損益</div>
-          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${d.netFinancialAssets>0?(d.totalGain/d.netFinancialAssets*100).toFixed(1):0}%)</span></div>
+          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${(()=>{const c=d.netFinancialAssets-d.totalGain;return c>0?(d.totalGain/c*100).toFixed(1):'0';})()}%)</span></div>
         </div>
         <div class="top-metric">
           <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
