@@ -635,6 +635,73 @@ function setupChartInteraction(projData) {
   });
 }
 
+// ── Annual Contribution Summary ───────────────────────────────────────────────
+function renderAnnualContrib(history, container) {
+  if (!history || history.length < 2) { container.innerHTML = ''; return; }
+
+  const now      = new Date();
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+
+  // Baseline: last row before Jan 1, or first row if all data is within current year
+  const prevRows = history.filter(r => r.date < yearStart);
+  const baseline = prevRows.length ? prevRows[prevRows.length - 1] : history[0];
+  const latest   = history[history.length - 1];
+
+  const t1  = Math.max(0, (latest.t1_index_cost||0)  - (baseline.t1_index_cost||0));
+  const t2  = Math.max(0, (latest.t2_cost||0)         - (baseline.t2_cost||0));
+  const t3a = Math.max(0, (latest.t3a_ideco_cost||0)  - (baseline.t3a_ideco_cost||0));
+  const total = t1 + t2 + t3a;
+
+  if (!total) { container.innerHTML = ''; return; }
+
+  // Days elapsed since start of measurement
+  const refDate  = prevRows.length ? yearStart : baseline.date;
+  const elapsed  = Math.max(1, (now - refDate) / (1000*60*60*24));
+  const yearFrac = Math.min(1, (now - yearStart) / (365.25*24*60*60*1000));
+  const annualise = v => v / elapsed * 365.25;
+
+  const C = { T1:'#58a6ff', T2:'#d29922', T3a:'#34d399' };
+  const rows = [
+    { label:'T1 NISA',   val:t1,  color:C.T1  },
+    { label:'T2 株式',   val:t2,  color:C.T2  },
+    { label:'T3a iDeCo', val:t3a, color:C.T3a },
+  ].filter(r => r.val > 0);
+
+  // "On pace" = actual vs what a linear year-end pace would give
+  // Bar: filled portion = % of year elapsed (the "expected" mark); dot = actual as % of annualised
+  const monthsElapsed = now.getMonth() + 1;
+  const yearLabel = prevRows.length
+    ? `${now.getFullYear()}年（${monthsElapsed}ヶ月経過・${(yearFrac*100).toFixed(0)}%）`
+    : `${now.getFullYear()}年 MTD`;
+
+  const rowsHtml = [...rows, { label:'合計', val:total, color:'rgba(255,255,255,0.5)', isTot:true }].map(r => {
+    const pace    = annualise(r.val);
+    const barFill = Math.min(100, yearFrac * 100);                  // year progress line
+    const actual  = Math.min(100, (r.val / Math.max(pace, 1)) * 100); // actual vs pace
+    const onPace  = actual >= barFill * 0.9;
+    const paceColor = onPace ? 'var(--green)' : 'var(--yellow)';
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:5px 0;${r.isTot?'border-top:1px solid rgba(255,255,255,0.07);margin-top:4px;padding-top:8px':''}">
+      <div style="display:flex;align-items:center;gap:6px;width:90px;flex-shrink:0">
+        ${!r.isTot?`<span style="width:8px;height:8px;border-radius:2px;background:${r.color};flex-shrink:0;display:inline-block"></span>`:'<span style="width:8px"></span>'}
+        <span style="font-size:12px;${r.isTot?'font-weight:700':''};color:var(--${r.isTot?'text':'muted'})">${r.label}</span>
+      </div>
+      <div style="flex:1;position:relative;height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">
+        <div style="position:absolute;left:0;top:0;height:100%;width:${barFill.toFixed(1)}%;background:rgba(255,255,255,0.1);border-radius:2px"></div>
+        <div style="position:absolute;left:0;top:0;height:100%;width:${Math.min(actual,barFill).toFixed(1)}%;background:${r.isTot?'rgba(255,255,255,0.4)':r.color};border-radius:2px"></div>
+      </div>
+      <span style="font-size:12px;font-variant-numeric:tabular-nums;min-width:80px;text-align:right">+${fmt(r.val)}</span>
+      <span style="font-size:11px;color:${paceColor};min-width:90px;text-align:right" title="年換算ペース">${fmt(Math.round(pace))}<span style="font-size:9px;color:var(--muted)">/年</span></span>
+    </div>`;
+  }).join('');
+
+  container.innerHTML = `<h2>年次積立サマリー</h2>
+  <div class="card" style="padding:14px 16px">
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">${yearLabel}</div>
+    ${rowsHtml}
+  </div>`;
+}
+
 // ── Savings Rate ──────────────────────────────────────────────────────────────
 function renderSavingsRate(d, waterfallData, container) {
   if (!waterfallData || !waterfallData.length) { container.innerHTML = ''; return; }
@@ -2198,6 +2265,9 @@ function render(d) {
       <!-- Savings rate -->
       <div id="savingsRateContainer"></div>
 
+      <!-- Annual contribution summary -->
+      <div id="annualContribContainer"></div>
+
       <!-- MoM snapshot (above AI summary) -->
       <div id="aiMomContainer"></div>
 
@@ -2389,6 +2459,7 @@ function render(d) {
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   const _waterfallData = buildWaterfallData(_history);
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
+  renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
   renderMoMSnapshot(d, _waterfallData, document.getElementById('aiMomContainer'));
   renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
