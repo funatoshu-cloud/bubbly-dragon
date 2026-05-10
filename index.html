@@ -1084,16 +1084,26 @@ function renderAISummary(d, waterfallData, container) {
     }</div>`;
   }
 
-  const hasContent = !!summary;
-  // Default open if summary exists, closed if not yet generated
-  const defaultOpen = hasContent;
+  // Extract plain-text preview: first 1-2 sentences of actual content (skip headings)
+  const previewText = (() => {
+    if (!summary) return tsLabel ? `${tsLabel} — click to expand` : 'Click to expand';
+    const firstPara = summary.split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#') && !l.startsWith('==='))
+      [0] || '';
+    const plain = firstPara.replace(/\*\*/g,'').replace(/\*/g,'');
+    return plain.length > 120 ? plain.slice(0, 117) + '…' : plain;
+  })();
 
   container.innerHTML = `
-    <h2 id="aiToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
-      AI サマリー
-      <span id="aiChevron" style="font-size:11px;color:var(--muted);transition:transform .2s;transform:${defaultOpen?'rotate(90deg)':'rotate(0deg)'}">&rsaquo;</span>
+    <h2 id="aiToggle" style="cursor:pointer;user-select:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>AI サマリー</span>
+        <span id="aiChevron" style="font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0">&rsaquo;</span>
+      </div>
+      <div id="aiPreview" style="font-size:12px;font-weight:400;color:var(--muted);margin-top:3px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${previewText}</div>
     </h2>
-    <div id="aiBody" style="display:${defaultOpen?'block':'none'}">
+    <div id="aiBody" style="display:none">
       <div class="ai-card">
         ${bodyHtml}
         <div class="ai-footer">
@@ -1104,11 +1114,13 @@ function renderAISummary(d, waterfallData, container) {
     </div>`;
 
   document.getElementById('aiToggle').addEventListener('click', () => {
-    const body = document.getElementById('aiBody');
-    const chevron = document.getElementById('aiChevron');
+    const body     = document.getElementById('aiBody');
+    const chevron  = document.getElementById('aiChevron');
+    const preview  = document.getElementById('aiPreview');
     const open = body.style.display === 'none';
-    body.style.display = open ? 'block' : 'none';
+    body.style.display    = open ? 'block' : 'none';
     chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+    preview.style.display = open ? 'none' : 'block';
   });
 
   if (scriptUrl) {
