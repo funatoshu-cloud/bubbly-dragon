@@ -635,6 +635,115 @@ function setupChartInteraction(projData) {
   });
 }
 
+// ── NW Milestones ─────────────────────────────────────────────────────────────
+function renderMilestones(d, waterfallData, container) {
+  if (!container) return;
+  const nw = d.totalNetWorth;
+  const MILESTONES = [10,20,30,40,50,60,70,80,90,100,120,150,200].map(m=>m*1e6);
+  const next = MILESTONES.find(m => m > nw);
+  const prev = [...MILESTONES].reverse().find(m => m <= nw) || 0;
+  if (!next) { container.innerHTML = ''; return; }
+
+  const pct = prev < next ? (nw - prev) / (next - prev) * 100 : 100;
+  const remaining = next - nw;
+
+  // Velocity from waterfall (3-month avg)
+  const vel = (() => {
+    if (!waterfallData || !waterfallData.length) return 0;
+    const sl = waterfallData.slice(-3);
+    return sl.reduce((s,m)=>s+m.total,0)/sl.length;
+  })();
+  const monthsTo = vel > 0 ? Math.ceil(remaining / vel) : null;
+  const timeStr = monthsTo
+    ? monthsTo < 12 ? `約${monthsTo}ヶ月` : `約${Math.floor(monthsTo/12)}年${monthsTo%12?monthsTo%12+'ヶ月':''}`
+    : null;
+
+  const fmtM = v => (v/1e6).toFixed(0)+'M';
+  container.innerHTML = `<div class="card" style="padding:12px 16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:8px">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">次のマイルストーン</span>
+        <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">¥${fmtM(next)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);text-align:right">
+        残り <span style="color:var(--text);font-weight:600;font-variant-numeric:tabular-nums">${fmt(remaining)}</span>
+        ${timeStr ? `&ensp;·&ensp;<span style="color:var(--green)">${timeStr}</span>` : ''}
+      </div>
+    </div>
+    <div style="position:relative;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
+      <div style="height:100%;width:${pct.toFixed(1)}%;background:linear-gradient(90deg,#3fb950,#58a6ff);border-radius:3px"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums">
+      <span>¥${fmtM(prev)}</span><span>¥${fmtM(next)}</span>
+    </div>
+  </div>`;
+}
+
+// ── Rebalancing Signal ─────────────────────────────────────────────────────────
+// Edit REBAL_TARGETS to match your personal target allocation (must sum to 100)
+const REBAL_TARGETS = { T0:8, T1:32, T2:22, 'T3(a)':8, 'T3(b)':14, T4:16 };
+
+function renderRebalancing(d, container) {
+  if (!container || !d.tiers || !d.tiers.length) return;
+  const total = d.tiers.reduce((s,t)=>s+Math.max(0,t.amount),0);
+  if (!total) { container.innerHTML=''; return; }
+
+  const TC = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
+
+  const rows = d.tiers.map(t => {
+    const actual  = t.amount / total * 100;
+    const target  = REBAL_TARGETS[t.id] ?? null;
+    const drift   = target !== null ? actual - target : null;
+    return { ...t, actual, target, drift };
+  });
+
+  // Biggest overweight = next contribution should go elsewhere
+  const drifted = rows.filter(r => r.drift !== null && Math.abs(r.drift) >= 2)
+                      .sort((a,b) => Math.abs(b.drift)-Math.abs(a.drift));
+
+  const signal = (() => {
+    const over  = drifted.filter(r=>r.drift>0)[0];
+    const under = drifted.filter(r=>r.drift<0).slice().sort((a,b)=>a.drift-b.drift)[0];
+    if (!over && !under) return `<span style="color:var(--green)">✓ バランス良好 — 大きな偏りはありません</span>`;
+    const parts = [];
+    if (under) parts.push(`次の積立は <strong style="color:${TC[under.id]||'#fff'}">${under.id}</strong> へ優先配分 (${under.drift.toFixed(1)}pp 不足)`);
+    if (over)  parts.push(`<strong style="color:${TC[over.id]||'#fff'}">${over.id}</strong> が目標比率を超過 (${over.drift>0?'+':''}${over.drift.toFixed(1)}pp)`);
+    return parts.join('&ensp;·&ensp;');
+  })();
+
+  const tableRows = rows.map(r => {
+    const drift = r.drift;
+    const driftColor = drift === null ? 'var(--muted)' : Math.abs(drift)<2 ? 'var(--muted)' : drift>0 ? 'var(--yellow)' : 'var(--green)';
+    const bar = `<div style="position:relative;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;width:80px;display:inline-block;vertical-align:middle">
+      ${r.target!==null?`<div style="position:absolute;left:${Math.min(100,r.target)}%;top:-2px;width:1px;height:7px;background:rgba(255,255,255,0.3)"></div>`:''}
+      <div style="height:100%;width:${Math.min(100,r.actual).toFixed(1)}%;background:${TC[r.id]||'#555'};border-radius:2px"></div>
+    </div>`;
+    return `<tr>
+      <td><span class="tier-badge ${r.color}">${r.id}</span></td>
+      <td style="font-variant-numeric:tabular-nums">${r.actual.toFixed(1)}%</td>
+      <td style="color:var(--muted);font-variant-numeric:tabular-nums">${r.target!==null?r.target+'%':'—'}</td>
+      <td style="font-variant-numeric:tabular-nums;color:${driftColor}">${drift!==null?(drift>=0?'+':'')+drift.toFixed(1)+'pp':'—'}</td>
+      <td style="padding-left:8px">${bar}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<h2>リバランス</h2>
+  <div class="card" style="padding:12px 16px">
+    <div style="font-size:12px;margin-bottom:12px;line-height:1.6">${signal}</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
+        <th style="text-align:left;padding-bottom:6px">Tier</th>
+        <th style="text-align:left;padding-bottom:6px">現在</th>
+        <th style="text-align:left;padding-bottom:6px">目標</th>
+        <th style="text-align:left;padding-bottom:6px">差</th>
+        <th style="padding-bottom:6px"></th>
+      </tr></thead>
+      <tbody style="line-height:2">${tableRows}</tbody>
+    </table>
+    <div style="font-size:10px;color:var(--muted);margin-top:10px">目標配分は REBAL_TARGETS で編集できます。差が ±2pp 未満の場合は表示のみ。</div>
+  </div>`;
+}
+
 // ── Annual Contribution Summary ───────────────────────────────────────────────
 function renderAnnualContrib(history, container) {
   if (!history || history.length < 2) { container.innerHTML = ''; return; }
@@ -2215,10 +2324,26 @@ function render(d) {
 
   const mainHtml = `
 
-    <!-- Row 1: 6 summary metrics -->
+    <!-- Row 1: summary metrics -->
     ${(()=>{
       const nfaMinusMortgage = d.netFinancialAssets - d.mortgage;
       const TIER_COLORS = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
+      // YoY: find history row ~365 days ago
+      const _cutoff = new Date(Date.now() - 365*24*60*60*1000);
+      const _oldRows = (_history||[]).filter(r=>r.date<=_cutoff);
+      const _yoyHtml = (() => {
+        if (!_oldRows.length) return '';
+        const o = _oldRows[_oldRows.length-1];
+        const oldNW = (o.t1_index_value||0)+(o.t2_value||0)+(o.t3a_ideco_value||0)+
+                      (o.t4_land||0)+(o.t4_building||0)-(o.t4_mortgage||0)+
+                      (o.t0_value||0)+(o.t1_gold||0)+(o.t1_hysa||0)+(o.t3a_insurance||0)+(o.t3b_value||0);
+        const delta = d.totalNetWorth - oldNW;
+        const pct   = oldNW ? (delta/oldNW*100) : 0;
+        return `<div class="top-metric">
+          <div class="top-metric-title">前年同期比</div>
+          <div class="top-metric-value ${colorClass(delta)}">${sign(delta)}${fmt(delta)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${pct>=0?'+':''}${pct.toFixed(1)}%)</span></div>
+        </div>`;
+      })();
       function tierBar(tiers) {
         const total = tiers.reduce((s,t) => s + t.amount, 0);
         return `<div class="tier-bar">${tiers.map(t =>
@@ -2254,10 +2379,14 @@ function render(d) {
           <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
           <div class="top-metric-value">${fmt(d.passiveIncomeActual)} / ${fmt(d.passiveIncomeTarget)}</div>
         </div>
+        ${_yoyHtml}
       </div>
 
       <!-- FIRE progress -->
       <div id="fireBarContainer"></div>
+
+      <!-- NW Milestone -->
+      <div id="milestoneContainer"></div>
 
       <!-- History chart -->
       <div id="historyChartContainer"></div>
@@ -2356,6 +2485,9 @@ function render(d) {
         </div>
       </div>`;
     })()}
+
+    <!-- Rebalancing -->
+    <div id="rebalancingContainer"></div>
 
     <!-- Leverage & Real Estate -->
     ${(()=>{
@@ -2456,10 +2588,12 @@ function render(d) {
   document.getElementById('dashboard').innerHTML = html;
   document.getElementById('dashboard-content').innerHTML = mainHtml;
   renderFireBar(d, document.getElementById('fireBarContainer'));
-  renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   const _waterfallData = buildWaterfallData(_history);
+  renderMilestones(d, _waterfallData, document.getElementById('milestoneContainer'));
+  renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
+  renderRebalancing(d, document.getElementById('rebalancingContainer'));
   renderMoMSnapshot(d, _waterfallData, document.getElementById('aiMomContainer'));
   renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
