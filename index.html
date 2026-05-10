@@ -679,71 +679,6 @@ function renderMilestones(d, waterfallData, container) {
   </div>`;
 }
 
-// ── Rebalancing Signal ─────────────────────────────────────────────────────────
-// Edit REBAL_TARGETS to match your personal target allocation (must sum to 100)
-const REBAL_TARGETS = { T0:8, T1:32, T2:22, 'T3(a)':8, 'T3(b)':14, T4:16 };
-
-function renderRebalancing(d, container) {
-  if (!container || !d.tiers || !d.tiers.length) return;
-  const total = d.tiers.reduce((s,t)=>s+Math.max(0,t.amount),0);
-  if (!total) { container.innerHTML=''; return; }
-
-  const TC = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
-
-  const rows = d.tiers.map(t => {
-    const actual  = t.amount / total * 100;
-    const target  = REBAL_TARGETS[t.id] ?? null;
-    const drift   = target !== null ? actual - target : null;
-    return { ...t, actual, target, drift };
-  });
-
-  // Biggest overweight = next contribution should go elsewhere
-  const drifted = rows.filter(r => r.drift !== null && Math.abs(r.drift) >= 2)
-                      .sort((a,b) => Math.abs(b.drift)-Math.abs(a.drift));
-
-  const signal = (() => {
-    const over  = drifted.filter(r=>r.drift>0)[0];
-    const under = drifted.filter(r=>r.drift<0).slice().sort((a,b)=>a.drift-b.drift)[0];
-    if (!over && !under) return `<span style="color:var(--green)">✓ バランス良好 — 大きな偏りはありません</span>`;
-    const parts = [];
-    if (under) parts.push(`次の積立は <strong style="color:${TC[under.id]||'#fff'}">${under.id}</strong> へ優先配分 (${under.drift.toFixed(1)}pp 不足)`);
-    if (over)  parts.push(`<strong style="color:${TC[over.id]||'#fff'}">${over.id}</strong> が目標比率を超過 (${over.drift>0?'+':''}${over.drift.toFixed(1)}pp)`);
-    return parts.join('&ensp;·&ensp;');
-  })();
-
-  const tableRows = rows.map(r => {
-    const drift = r.drift;
-    const driftColor = drift === null ? 'var(--muted)' : Math.abs(drift)<2 ? 'var(--muted)' : drift>0 ? 'var(--yellow)' : 'var(--green)';
-    const bar = `<div style="position:relative;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;width:80px;display:inline-block;vertical-align:middle">
-      ${r.target!==null?`<div style="position:absolute;left:${Math.min(100,r.target)}%;top:-2px;width:1px;height:7px;background:rgba(255,255,255,0.3)"></div>`:''}
-      <div style="height:100%;width:${Math.min(100,r.actual).toFixed(1)}%;background:${TC[r.id]||'#555'};border-radius:2px"></div>
-    </div>`;
-    return `<tr>
-      <td><span class="tier-badge ${r.color}">${r.id}</span></td>
-      <td style="font-variant-numeric:tabular-nums">${r.actual.toFixed(1)}%</td>
-      <td style="color:var(--muted);font-variant-numeric:tabular-nums">${r.target!==null?r.target+'%':'—'}</td>
-      <td style="font-variant-numeric:tabular-nums;color:${driftColor}">${drift!==null?(drift>=0?'+':'')+drift.toFixed(1)+'pp':'—'}</td>
-      <td style="padding-left:8px">${bar}</td>
-    </tr>`;
-  }).join('');
-
-  container.innerHTML = `<h2>リバランス</h2>
-  <div class="card" style="padding:12px 16px">
-    <div style="font-size:12px;margin-bottom:12px;line-height:1.6">${signal}</div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
-        <th style="text-align:left;padding-bottom:6px">Tier</th>
-        <th style="text-align:left;padding-bottom:6px">現在</th>
-        <th style="text-align:left;padding-bottom:6px">目標</th>
-        <th style="text-align:left;padding-bottom:6px">差</th>
-        <th style="padding-bottom:6px"></th>
-      </tr></thead>
-      <tbody style="line-height:2">${tableRows}</tbody>
-    </table>
-    <div style="font-size:10px;color:var(--muted);margin-top:10px">目標配分は REBAL_TARGETS で編集できます。差が ±2pp 未満の場合は表示のみ。</div>
-  </div>`;
-}
-
 // ── Annual Contribution Summary ───────────────────────────────────────────────
 function renderAnnualContrib(history, container) {
   if (!history || history.length < 2) { container.innerHTML = ''; return; }
@@ -2486,9 +2421,6 @@ function render(d) {
       </div>`;
     })()}
 
-    <!-- Rebalancing -->
-    <div id="rebalancingContainer"></div>
-
     <!-- Leverage & Real Estate -->
     ${(()=>{
       function lc(metric) {
@@ -2593,7 +2525,6 @@ function render(d) {
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
-  renderRebalancing(d, document.getElementById('rebalancingContainer'));
   renderMoMSnapshot(d, _waterfallData, document.getElementById('aiMomContainer'));
   renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
   renderWaterfallChart(_history, document.getElementById('waterfallContainer'));
