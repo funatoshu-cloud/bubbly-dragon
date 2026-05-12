@@ -635,7 +635,7 @@ function setupChartInteraction(projData) {
 }
 
 // ── NW Milestones ─────────────────────────────────────────────────────────────
-function renderMilestones(d, waterfallData, container) {
+function renderMilestones(d, waterfallData, rates, container) {
   if (!container) return;
   const nw = d.netFinancialAssets;
   const MILESTONES = [50,100,200,300].map(m=>m*1e6);
@@ -646,13 +646,20 @@ function renderMilestones(d, waterfallData, container) {
   const pct = prev < next ? (nw - prev) / (next - prev) * 100 : 100;
   const remaining = next - nw;
 
-  // Velocity: NFA-only (contrib + returns, exclude RE/mortgage)
-  const vel = (() => {
-    if (!waterfallData || !waterfallData.length) return 0;
-    const sl = waterfallData.slice(-3);
-    return sl.reduce((s,m)=>s+(m.contrib||0)+(m.returns||0),0)/sl.length;
-  })();
-  const monthsTo = vel > 0 ? Math.ceil(remaining / vel) : null;
+  // ETA: use same projectBucket formula as projection tab base case (NFA buckets only, excludes T4)
+  const NFA_KEYS = ['t1_index','t2','t3a_ideco','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
+  let monthsTo = null;
+  if (rates) {
+    for (let m = 1; m <= 600; m++) {
+      let projNFA = 0;
+      for (const key of NFA_KEYS) {
+        const r = rates[key];
+        if (!r) continue;
+        projNFA += projectBucket(r.currentValue, r.monthlyContrib, r.annualBase, m);
+      }
+      if (projNFA >= next) { monthsTo = m; break; }
+    }
+  }
   const timeStr = monthsTo
     ? monthsTo < 12 ? `約${monthsTo}ヶ月` : `約${Math.floor(monthsTo/12)}年${monthsTo%12?monthsTo%12+'ヶ月':''}`
     : null;
@@ -2623,7 +2630,8 @@ function render(d) {
   document.getElementById('dashboard-content').innerHTML = mainHtml;
   renderFireBar(d, document.getElementById('fireBarContainer'));
   const _waterfallData = buildWaterfallData(_history);
-  renderMilestones(d, _waterfallData, document.getElementById('milestoneContainer'));
+  const _rates = _history.length >= 2 ? computeRates(_history) : null;
+  renderMilestones(d, _waterfallData, _rates, document.getElementById('milestoneContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
