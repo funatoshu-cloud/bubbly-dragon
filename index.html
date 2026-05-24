@@ -24,7 +24,13 @@
   --yellow: #d29922;
   --blue: #58a6ff;
   --purple: #bc8cff;
-  --accent: #1a5c2a;
+  /* Tier colors — single source of truth for badges, donut, legend */
+  --tier-t0: #58a6ff;
+  --tier-t1: #3fb950;
+  --tier-t2: #d29922;
+  --tier-t3a: #bc8cff;
+  --tier-t3b: #f0883e;
+  --tier-t4: #8b949e;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { background: var(--bg); color: var(--text); font-family: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
@@ -48,7 +54,7 @@ a { color: var(--blue); }
 .header-title img { width: 26px; height: 26px; flex-shrink: 0; border-radius: 6px; }
 .header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--muted); }
-.btn { background: var(--accent); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.btn { background: var(--green); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .btn:hover { opacity: .85; }
 .btn:disabled { opacity: .4; cursor: default; }
 
@@ -62,12 +68,12 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .tier-table tfoot td { border-bottom: none; border-top: 1px solid var(--border); font-weight: 700; }
 .tier-table tbody tr:hover td { background: var(--surface2); }
 .tier-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
-.t0 { background:#0c1e2e; color:#58a6ff; }
-.t1 { background:#0c2018; color:#3fb950; }
-.t2 { background:#261a08; color:#d29922; }
-.t3a { background:#1a1028; color:#bc8cff; }
-.t3b { background:#240e14; color:#f0883e; }
-.t4 { background:#151a22; color:#8b949e; }
+.t0 { background:#0c1e2e; color:var(--tier-t0); }
+.t1 { background:#0c2018; color:var(--tier-t1); }
+.t2 { background:#261a08; color:var(--tier-t2); }
+.t3a { background:#1a1028; color:var(--tier-t3a); }
+.t3b { background:#240e14; color:var(--tier-t3b); }
+.t4 { background:#151a22; color:var(--tier-t4); }
 .pct-bar-wrap { display: flex; align-items: center; }
 .pct-bar { height: 3px; border-radius: 2px; background: var(--blue); flex-shrink: 0; opacity: .6; }
 
@@ -245,14 +251,6 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 .top-metric-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
 
 /* Equation row */
-.eq-row { display: flex; align-items: stretch; margin-bottom: 12px; }
-.eq-card { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 13px 16px; min-width: 0; }
-.eq-op { display: flex; align-items: center; justify-content: center; width: 30px; flex-shrink: 0; font-size: 17px; font-weight: 600; color: var(--muted); }
-.eq-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 5px; }
-.eq-value { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; margin-bottom: 2px; }
-.eq-sub { font-size: 10px; color: var(--muted); }
-.tier-bar { display: flex; height: 3px; border-radius: 2px; overflow: hidden; margin-top: 10px; }
-.tier-bar span { height: 100%; }
 
 /* Loading / error */
 #loading { text-align: center; padding: 60px; color: var(--muted); }
@@ -310,14 +308,15 @@ input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
   .grid-4 { grid-template-columns: repeat(2,1fr); }
   .grid-3 { grid-template-columns: repeat(2,1fr); }
   .sector-name { width: 130px; }
-  .eq-value { font-size: 14px; }
-  .eq-op { width: 22px; font-size: 13px; }
+}
+@media (max-width: 800px) {
+  .top-metrics { grid-template-columns: repeat(2,1fr); }
+  .tier-table th, .tier-table td { padding: 7px 8px; font-size: 12px; }
+  .holdings-table { font-size: 11px; }
+  .hchart-card svg, #waterfallContainer svg, #passiveIncomeContainer svg { padding-right: 4px; }
 }
 @media (max-width: 600px) {
   .top-metrics { grid-template-columns: repeat(2,1fr); }
-  .eq-row { flex-wrap: wrap; gap: 8px; }
-  .eq-card { flex: 1 1 40%; }
-  .eq-op { display: none; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   .header { flex-direction: column; align-items: flex-start; }
   .lev-header { flex-direction: column; align-items: flex-start; gap: 2px; }
@@ -379,6 +378,44 @@ function arrStddev(arr) {
   return Math.sqrt(arr.reduce((s,v)=>s+(v-mean)**2,0)/(arr.length-1));
 }
 
+// Rate caps — bound annualBase and annualSigma so projections stay realistic and projectBucket math stays safe
+const RATE_CAP = { base: 0.25, sigma: 0.25 };  // ±25% annual base, ≤25% σ
+function clampRate(r, cap) {
+  if (!isFinite(r)) return { v: 0, clamped: true };
+  const c = Math.max(-cap, Math.min(cap, r));
+  return { v: c, clamped: c !== r };
+}
+
+// Value caps — per-bucket floor as fraction of total invested capital, and shared ceiling growth rate
+// Floor reflects historic worst-case real drawdowns; ceiling caps best-case compound growth at 12%/yr
+const FLOOR_MULT = {
+  t0:            0.95,  // cash — minor FX/inflation risk only
+  t1_index:      0.50,  // diversified equities — historic ~50% max drawdown
+  t1_gold:       0.65,  // gold — ~35% historic drawdowns
+  t1_hysa:       0.98,  // HYSA — effectively guaranteed
+  t2:            0.50,  // individual stocks — same as index
+  t3a_ideco:     0.55,  // locked retirement diversified — slightly more conservative
+  t3a_insurance: 0.90,  // insurance — usually has guaranteed minimum
+  t3b:           0.60,  // 529 / education — typically conservative allocation
+  t4:            null,  // T4 handled separately (mortgage paydown model)
+};
+const CEIL_ANNUAL = 0.12;  // best-case compound rate ceiling — matches best historic decades
+
+function applyValueCap(projectedVal, currentVal, monthlyContrib, months, stopMonths, key, mode) {
+  const capitalIn = currentVal + monthlyContrib * Math.min(months, stopMonths);
+  if (capitalIn <= 0) return projectedVal;
+  if (mode === 'down') {  // pessimistic or stress — apply floor
+    const f = FLOOR_MULT[key];
+    if (f == null) return projectedVal;
+    return Math.max(projectedVal, capitalIn * f);
+  }
+  if (mode === 'up') {  // optimistic — apply ceiling
+    const ceilFV = capitalIn * Math.pow(1 + CEIL_ANNUAL, months / 12);
+    return Math.min(projectedVal, ceilFV);
+  }
+  return projectedVal;
+}
+
 function computeRates(history) {
   if (history.length < 2) return null;
   const rates = {};
@@ -400,7 +437,9 @@ function computeRates(history) {
     const med=arrMedian(dailyReturns), sd=arrStddev(dailyReturns);
     const filt=dailyReturns.filter(r=>Math.abs(r-med)<=3*sd);
     const last=history[history.length-1];
-    rates[key]={ annualBase:arrMedian(filt)*252, annualSigma:arrStddev(filt)*Math.sqrt(252), monthlyContrib:arrMedian(monthlyContribs)||0, currentValue:last[vCol]||0 };
+    const b=clampRate(arrMedian(filt)*252, RATE_CAP.base);
+    const s=clampRate(arrStddev(filt)*Math.sqrt(252), RATE_CAP.sigma);
+    rates[key]={ annualBase:b.v, annualSigma:s.v, _baseClamped:b.clamped, _sigmaClamped:s.clamped, monthlyContrib:arrMedian(monthlyContribs)||0, currentValue:last[vCol]||0 };
   }
 
   // T4: separate property appreciation from mortgage paydown
@@ -427,52 +466,72 @@ function computeRates(history) {
   // Paydown starts June 1 2026; offset = months from today (clamped ≥ 0)
   const _paydownStartOffset=Math.max(0,Math.round((new Date('2026-06-01')-new Date())/(1000*60*60*24*30.44)));
   const _propValue=(last.t4_land||0)+(last.t4_building||0);
-  rates.t4={ annualBase:arrMedian(t4Filt)*365||0, annualSigma:arrStddev(t4Filt)*Math.sqrt(365)||0, monthlyContrib:typicalPmt, currentValue:_propValue-(last.t4_mortgage||0), _propertyValue:_propValue, _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt, _paydownStartOffset };
+  const t4b=clampRate(arrMedian(t4Filt)*365||0, RATE_CAP.base);
+  const t4s=clampRate(arrStddev(t4Filt)*Math.sqrt(365)||0, RATE_CAP.sigma);
+  rates.t4={ annualBase:t4b.v, annualSigma:t4s.v, _baseClamped:t4b.clamped, _sigmaClamped:t4s.clamped, monthlyContrib:typicalPmt, currentValue:_propValue-(last.t4_mortgage||0), _propertyValue:_propValue, _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt, _paydownStartOffset };
 
   // Monthly buckets: simple ΔV/V
   for (const [key,col] of [['t0','t0_value'],['t1_hysa','t1_hysa'],['t1_gold','t1_gold'],['t3a_insurance','t3a_insurance'],['t3b','t3b_value']]) {
     const returns=[]; let prev=null;
     for (const row of history) { const v=row[col]; if(v!==null){if(prev!==null&&prev>0&&v!==prev) returns.push((v-prev)/prev); prev=v;} }
-    rates[key]={ annualBase:arrMedian(returns)*12, annualSigma:arrStddev(returns)*Math.sqrt(12), monthlyContrib:0, currentValue:last[col]||0 };
+    const b=clampRate(arrMedian(returns)*12, RATE_CAP.base);
+    const s=clampRate(arrStddev(returns)*Math.sqrt(12), RATE_CAP.sigma);
+    rates[key]={ annualBase:b.v, annualSigma:s.v, _baseClamped:b.clamped, _sigmaClamped:s.clamped, monthlyContrib:0, currentValue:last[col]||0 };
   }
   return rates;
 }
 
 function projectBucket(currentVal, monthlyContrib, annualRate, months) {
-  const r=annualRate/12;
+  // Safety floor: prevents r ≤ -1 from sign-flipping Math.pow output
+  const safeAnnual=Math.max(-0.50, annualRate);
+  const r=safeAnnual/12;
   if(Math.abs(r)<0.000001) return currentVal+monthlyContrib*months;
   const g=Math.pow(1+r,months);
   return currentVal*g+monthlyContrib*(g-1)/r;
 }
 
+// Stress test: simulate an immediate -30% drop on investment buckets in month 0, then recover at base rate
+const SHOCK_BUCKETS = new Set(['t1_index','t2','t3a_ideco']);
+const SHOCK = 0.70;  // -30%
+
 function buildProjection(rates, months, stopMonths) {
   const KEYS=['t1_index','t2','t3a_ideco','t4','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
   const result=[];
   for(let m=0;m<=months;m++){
-    let base=0,opt=0,pess=0;
+    let base=0,opt=0,pess=0,stress=0;
     for(const key of KEYS){
       const r=rates[key]; if(!r) continue;
       // Linear mortgage paydown for RE-excluded mode
       if(r._isLinearPaydown){
         const fv=Math.min(0, r.currentValue + m * r._monthlyPaydown);
-        base+=fv; opt+=fv; pess+=fv; continue;
+        base+=fv; opt+=fv; pess+=fv; stress+=fv; continue;
       }
       // T4: split property appreciation (compounding on full property value) from
       // mortgage paydown (fixed monthly principal, linear, starting _paydownStartOffset)
       if(key==='t4' && r._propertyValue!==undefined){
         const payMo=Math.max(0, m-(r._paydownStartOffset||0));
         const mortFV=Math.max(0, r._mortgageBalance - r.monthlyContrib*payMo);
-        base+=projectBucket(r._propertyValue,0,r.annualBase,              m)-mortFV;
-        opt +=projectBucket(r._propertyValue,0,r.annualBase+r.annualSigma,m)-mortFV;
-        pess+=projectBucket(r._propertyValue,0,r.annualBase-r.annualSigma,m)-mortFV;
+        const t4Base=projectBucket(r._propertyValue,0,r.annualBase,              m)-mortFV;
+        const t4Opt =projectBucket(r._propertyValue,0,r.annualBase+r.annualSigma,m)-mortFV;
+        const t4Pess=projectBucket(r._propertyValue,0,r.annualBase-r.annualSigma,m)-mortFV;
+        base+=t4Base; opt+=t4Opt; pess+=t4Pess; stress+=t4Base;
         continue;
       }
       const contrib = (m <= stopMonths) ? r.monthlyContrib : 0;
+      // Base — no value cap (median rate is inherently reasonable)
       base +=projectBucket(r.currentValue,contrib,r.annualBase,m);
-      opt  +=projectBucket(r.currentValue,contrib,r.annualBase+r.annualSigma,m);
-      pess +=projectBucket(r.currentValue,contrib,r.annualBase-r.annualSigma,m);
+      // Optimistic — ceiling cap
+      const optRaw=projectBucket(r.currentValue,contrib,r.annualBase+r.annualSigma,m);
+      opt  +=applyValueCap(optRaw, r.currentValue, contrib, m, stopMonths, key, 'up');
+      // Pessimistic — floor cap
+      const pessRaw=projectBucket(r.currentValue,contrib,r.annualBase-r.annualSigma,m);
+      pess +=applyValueCap(pessRaw, r.currentValue, contrib, m, stopMonths, key, 'down');
+      // Stress — shock starting value on investment buckets, base-rate compounding, floor cap
+      const stressStart = SHOCK_BUCKETS.has(key) ? r.currentValue * SHOCK : r.currentValue;
+      const stressRaw=projectBucket(stressStart,contrib,r.annualBase,m);
+      stress +=applyValueCap(stressRaw, stressStart, contrib, m, stopMonths, key, 'down');
     }
-    result.push({month:m,base,optimistic:opt,pessimistic:pess});
+    result.push({month:m,base,optimistic:opt,pessimistic:pess,stress});
   }
   return result;
 }
@@ -481,7 +540,8 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   const W=800,H=320,PL=72,PR=20,PT=10,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
   const months=projData[projData.length-1].month;
-  const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
+  const hasStress=projData[0].stress!==undefined;
+  const allV=projData.flatMap(p=>hasStress?[p.base,p.optimistic,p.pessimistic,p.stress]:[p.base,p.optimistic,p.pessimistic]);
   if(targetNW) allV.push(targetNW);
   const rawMin=Math.min(...allV), rawMax=Math.max(...allV);
   const pad=(rawMax-rawMin)*0.04||Math.abs(rawMax||rawMin)*0.04||1e6;
@@ -531,12 +591,14 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   const hairline=`<line id="chartHairline" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2" pointer-events="none" visibility="hidden"/>`;
   const dots=`<circle id="chartDotOpt" r="4" fill="rgba(63,185,80,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
   <circle id="chartDotBase" r="4" fill="#58a6ff" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
-  <circle id="chartDotPess" r="4" fill="rgba(248,81,73,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>`;
+  <circle id="chartDotPess" r="4" fill="rgba(248,81,73,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>
+  ${hasStress?`<circle id="chartDotStress" r="4" fill="rgba(139,148,158,0.85)" stroke="#0a0c13" stroke-width="2" pointer-events="none" visibility="hidden"/>`:''}`;
   const overlay=`<rect id="chartOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair;touch-action:none"/>`;
 
   return `<svg id="projSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
   ${grid}${yLbl}${xLbl}${zeroLine}${todayLine}${targetLine}${coastLine}
   <polygon points="${bandPts}" fill="rgba(88,166,255,0.07)"/>
+  ${hasStress?line('stress','rgba(139,148,158,0.7)','2,3'):''}
   ${line('pessimistic','rgba(248,81,73,0.7)','5,4')}
   ${line('optimistic','rgba(63,185,80,0.7)','5,4')}
   ${line('base','#58a6ff')}
@@ -549,7 +611,8 @@ function setupChartInteraction(projData) {
   const W=800,H=320,PL=72,PR=20,PT=10,PB=36;
   const cW=W-PL-PR, cH=H-PT-PB;
   const maxM=projData[projData.length-1].month;
-  const allV=projData.flatMap(p=>[p.base,p.optimistic,p.pessimistic]);
+  const hasStress=projData[0].stress!==undefined;
+  const allV=projData.flatMap(p=>hasStress?[p.base,p.optimistic,p.pessimistic,p.stress]:[p.base,p.optimistic,p.pessimistic]);
   const rawMin=Math.min(...allV), rawMax=Math.max(...allV);
   const pad=(rawMax-rawMin)*0.04||Math.abs(rawMax||rawMin)*0.04||1e6;
   const minV=rawMin-pad, maxV=rawMax+pad;
@@ -562,6 +625,7 @@ function setupChartInteraction(projData) {
   const dO=document.getElementById('chartDotOpt');
   const dB=document.getElementById('chartDotBase');
   const dP=document.getElementById('chartDotPess');
+  const dS=document.getElementById('chartDotStress');
   const pChart=document.getElementById('pChart');
   if(!svg||!ov||!pChart) return;
 
@@ -594,22 +658,27 @@ function setupChartInteraction(projData) {
     [[dO,'optimistic'],[dB,'base'],[dP,'pessimistic']].forEach(([el,key])=>{
       el.setAttribute('cx',hx); el.setAttribute('cy',ys(pt[key]).toFixed(1)); el.setAttribute('visibility','visible');
     });
+    if(dS && hasStress){
+      dS.setAttribute('cx',hx); dS.setAttribute('cy',ys(pt.stress).toFixed(1)); dS.setAttribute('visibility','visible');
+    }
 
     const tipX=clientX-containerRect.left, tipY=clientY-containerRect.top;
     const flipLeft=tipX>containerRect.width*0.62;
     tip.style.left=flipLeft?'auto':(tipX+14)+'px';
     tip.style.right=flipLeft?(containerRect.width-tipX+14)+'px':'auto';
-    tip.style.top=Math.max(0,tipY-56)+'px';
+    tip.style.top=Math.max(0,tipY-68)+'px';
     tip.innerHTML=`<div style="font-size:11px;font-weight:700;color:#6b7888;margin-bottom:6px;letter-spacing:.04em">${monthLabel(pt.month)}</div>`+
       `<div style="color:rgba(63,185,80,0.9);margin-bottom:2px">▲ ${fmt(pt.optimistic)}</div>`+
       `<div style="color:#58a6ff;margin-bottom:2px">— ${fmt(pt.base)}</div>`+
-      `<div style="color:rgba(248,81,73,0.85)">▼ ${fmt(pt.pessimistic)}</div>`;
+      `<div style="color:rgba(248,81,73,0.85);margin-bottom:${hasStress?'2px':'0'}">▼ ${fmt(pt.pessimistic)}</div>`+
+      (hasStress?`<div style="color:rgba(139,148,158,0.9)">⚠ ${fmt(pt.stress)} <span style="color:#6b7888;font-size:10px">worst</span></div>`:'');
     tip.style.display='block';
   }
 
   function hide() {
     hl.setAttribute('visibility','hidden');
     [dO,dB,dP].forEach(el=>el.setAttribute('visibility','hidden'));
+    if(dS) dS.setAttribute('visibility','hidden');
     tip.style.display='none';
   }
 
@@ -632,6 +701,37 @@ function setupChartInteraction(projData) {
   ov.addEventListener('touchend', ()=>{
     setTimeout(hide, 1200);
   });
+}
+
+// ── SWR / Withdrawal Readiness ────────────────────────────────────────────────
+function renderSWRCard(d, container) {
+  if (!container) return;
+  const target = d.passiveIncomeTarget || 0;
+  if (target <= 0) { container.innerHTML = ''; return; }
+  const SWR = 0.04;
+  const safeWithdraw = d.netFinancialAssets * SWR;
+  const coverage = (safeWithdraw / target * 100);
+  const nfaForFullCoverage = target / SWR;
+  const gap = Math.max(0, nfaForFullCoverage - d.netFinancialAssets);
+  const color = coverage >= 100 ? 'var(--green)' : coverage >= 75 ? 'var(--yellow)' : 'var(--red)';
+
+  container.innerHTML = `<div class="card" style="padding:12px 16px">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">FIRE準備度 (4%ルール)</span>
+      <span style="font-size:12px;color:var(--muted)">純金融資産 × 4%</span>
+    </div>
+    <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">${fmt(safeWithdraw)}/年</span>
+      <span style="font-size:12px;color:var(--muted)">vs 目標 ${fmt(target)}/年</span>
+      <span style="font-size:14px;font-weight:700;color:${color};font-variant-numeric:tabular-nums">${coverage.toFixed(0)}%</span>
+    </div>
+    <div style="position:relative;height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px">
+      <div style="height:100%;width:${Math.min(100,coverage).toFixed(1)}%;background:${color};border-radius:3px"></div>
+    </div>
+    ${gap > 0
+      ? `<div style="font-size:11px;color:var(--muted)">完全カバーまで純金融資産 <span style="color:var(--text);font-weight:600">${fmt(gap)}</span> 不足</div>`
+      : `<div style="font-size:11px;color:var(--green)">✓ 4%ルールで目標カバー可能</div>`}
+  </div>`;
 }
 
 // ── NW Milestones ─────────────────────────────────────────────────────────────
@@ -1192,10 +1292,7 @@ async function regenerateSummary(d, waterfallData) {
   // Apps Script reads all metrics directly from the sheet, so no data needed here.
   // We can't read the opaque response; instead we reload the sheet after a delay
   // to pick up the summary written to AB21/AB22 by the script.
-  console.log('[WealthTrack] Triggering Apps Script:', url);
-  fetch(url, { mode: 'no-cors' }).then(() => {
-    console.log('[WealthTrack] Fetch fired (opaque response — check Apps Script execution logs if sheet not updated)');
-  }).catch(err => {
+  fetch(url, { mode: 'no-cors' }).catch(err => {
     console.error('[WealthTrack] Fetch failed:', err);
   });
 
@@ -1805,11 +1902,11 @@ function renderHistoryChart(history, container) {
   draw();
 }
 
-function renderProjection(d, history) {
+function renderProjection(d, history, precomputedRates) {
   const el=document.getElementById('projection'); if(!el) return;
   const histDays=history.length;
-  const canAuto=histDays>=30;
-  const rates=history.length>=2?computeRates(history):null; // always compute for display; canAuto gates projection quality
+  // Reuse rates computed in loadAndRender when available; only recompute if missing
+  const rates=precomputedRates!==undefined?precomputedRates:(history.length>=2?computeRates(history):null);
 
   const BUCKET_LABELS={t1_index:'T1 Index funds',t2:'T2 Stocks',t3a_ideco:'T3(a) iDeCo',t4:'T4 Real estate equity',t0:'T0 Cash',t1_hysa:'T1 HYSA',t1_gold:'T1 Gold',t3a_insurance:'T3(a) Insurance',t3b:'T3(b) 529'};
   const HAS_CONTRIB=['t1_index','t2','t3a_ideco'];
@@ -1840,8 +1937,11 @@ function renderProjection(d, history) {
     if (!cv && key !== 't4') return ''; // skip empty buckets except T4
     const base = r ? r.annualBase : null;
     const sigma = r ? r.annualSigma : null;
+    const clampBadge = (r && (r._baseClamped || r._sigmaClamped))
+      ? `<span title="Rate clamped to ±25%/yr to keep projection realistic" style="color:var(--yellow);margin-left:4px;cursor:help">⚠</span>`
+      : '';
     const baseStr = base !== null
-      ? `<span style="color:${base>=0?'var(--green)':'var(--red)'}">${base>=0?'+':''}${(base*100).toFixed(1)}%</span>`
+      ? `<span style="color:${base>=0?'var(--green)':'var(--red)'}">${base>=0?'+':''}${(base*100).toFixed(1)}%</span>${clampBadge}`
       : `<span style="color:var(--muted)">—</span>`;
     const sigmaStr = sigma !== null && sigma > 0
       ? `<span style="color:var(--muted)">±${(sigma*100).toFixed(1)}%</span>`
@@ -1922,6 +2022,7 @@ function renderProjection(d, history) {
       <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>Optimistic</span>
       <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>Base</span>
       <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#f85149"/></svg>Pessimistic</span>
+      <span title="-30% drop on T1 index, T2 stocks, T3a iDeCo in year 1, then base-rate recovery" style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="rgba(139,148,158,0.85)" stroke-width="2" stroke-dasharray="2,3"/></svg>Worst case</span>
       <span id="pLegendCoast" style="display:none;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/></svg>Coast FIRE</span>
     </div>
     <div class="card" style="padding:6px 6px 0"><div id="pChart"></div><div id="pAnnotation" style="padding:4px 6px 8px;font-size:12px"></div></div>
@@ -2084,7 +2185,6 @@ function renderProjection(d, history) {
 
 // Hardcoded targets/goals not present in clean data:
 const PASSIVE_INCOME_TARGET = 831264;
-const TIER_GOAL = 60000000; // Stretch goal
 const MORTGAGE_RATE = 0.0093;        // 0.93% annual
 const MORTGAGE_TERM_YEARS = 40;
 
@@ -2244,22 +2344,6 @@ function trafficLight(actual, target, higherIsBad) {
   return (higherIsBad ? actual > target : actual < target) ? 'bad' : 'ok';
 }
 
-// Heat-map style matching portfolio new's color scale (-5 to +5)
-const HEAT = {
-  5:  'background:#052e10;color:#22c55e',
-  4:  'background:#073b14;color:#4ade80',
-  3:  'background:#0a4a1a;color:#86efac',
-  2:  'background:#0f5c22;color:#bbf7d0',
-  1:  'background:#1a6b2e;color:#dcfce7',
-  0:  'background:transparent;color:#8b949e',
-  '-1': 'background:#3b0a0a;color:#fee2e2',
-  '-2': 'background:#4d1010;color:#fca5a5',
-  '-3': 'background:#621414;color:#f87171',
-  '-4': 'background:#7a1818;color:#ef4444',
-  '-5': 'background:#1a0505;color:#dc2626',
-};
-function heatStyle(code) { return HEAT[code] || HEAT[0]; }
-
 // ── Main render ───────────────────────────────────────────────────────────────
 function render(d) {
   const now = new Date();
@@ -2368,7 +2452,6 @@ function render(d) {
     <!-- Row 1: summary metrics -->
     ${(()=>{
       const nfaMinusMortgage = d.netFinancialAssets - d.mortgage;
-      const TIER_COLORS = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
       // YoY: find history row ~365 days ago
       const _cutoff = new Date(Date.now() - 365*24*60*60*1000);
       const _oldRows = (_history||[]).filter(r=>r.date<=_cutoff);
@@ -2385,14 +2468,6 @@ function render(d) {
           <div class="top-metric-value ${colorClass(delta)}">${sign(delta)}${fmt(delta)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${pct>=0?'+':''}${pct.toFixed(1)}%)</span></div>
         </div>`;
       })();
-      function tierBar(tiers) {
-        const total = tiers.reduce((s,t) => s + t.amount, 0);
-        return `<div class="tier-bar">${tiers.map(t =>
-          `<span style="width:${(t.amount/total*100).toFixed(2)}%;background:${TIER_COLORS[t.id]||'#555'}"></span>`
-        ).join('')}</div>`;
-      }
-      const nfaTiers  = d.tiers.slice(0, 5); // T0–T3b
-      const allTiers  = d.tiers;             // T0–T4
 
       return `
       <div class="top-metrics">
@@ -2429,6 +2504,9 @@ function render(d) {
       <!-- NW Milestone -->
       <div id="milestoneContainer"></div>
 
+      <!-- SWR / Withdrawal readiness -->
+      <div id="swrContainer"></div>
+
       <!-- History chart -->
       <div id="historyChartContainer"></div>
 
@@ -2450,42 +2528,21 @@ function render(d) {
       <!-- Passive income history -->
       <div id="passiveIncomeContainer"></div>
 
-      <!-- Row 2: equation -->
-      <div class="eq-row">
-        <div class="eq-card">
-          <div class="eq-title">純金融資産</div>
-          <div class="eq-value gain">${fmt(d.netFinancialAssets)}</div>
-          <div class="eq-sub">T0 + T1 + T2 + T3(a) + T3(b)</div>
-          ${tierBar(nfaTiers)}
-        </div>
-        <div class="eq-op">+</div>
-        <div class="eq-card">
-          <div class="eq-title">不動産価値</div>
-          <div class="eq-value gain">${fmt(d.realEstateValue)}</div>
-          <div class="eq-sub">土地価格＋建物減価償却</div>
-          ${tierBar([d.tiers[5]])}
-        </div>
-        <div class="eq-op" style="color:var(--red)">-</div>
-        <div class="eq-card">
-          <div class="eq-title">住宅ローン残高</div>
-          <div class="eq-value loss">${fmt(d.mortgage)}</div>
-          <div class="eq-sub">0.93% | 40年 | 元利金等</div>
-          <div class="tier-bar"><span style="width:100%;background:var(--red)"></span></div>
-        </div>
-        <div class="eq-op">=</div>
-        <div class="eq-card">
-          <div class="eq-title">純資産合計</div>
-          <div class="eq-value gain">${fmt(d.totalNetWorth)}</div>
-          <div class="eq-sub">T0〜T4 全部合計</div>
-          ${tierBar(allTiers)}
-        </div>
-      </div>`;
+      `;
     })()}
 
     <!-- Asset Tiers -->
     <h2>資産 Tier</h2>
     ${(()=>{
-      const DC = { T0:'#58a6ff', T1:'#3fb950', T2:'#d29922', 'T3(a)':'#bc8cff', 'T3(b)':'#f0883e', T4:'#8b949e' };
+      const _cs = getComputedStyle(document.documentElement);
+      const DC = {
+        T0:     _cs.getPropertyValue('--tier-t0').trim(),
+        T1:     _cs.getPropertyValue('--tier-t1').trim(),
+        T2:     _cs.getPropertyValue('--tier-t2').trim(),
+        'T3(a)':_cs.getPropertyValue('--tier-t3a').trim(),
+        'T3(b)':_cs.getPropertyValue('--tier-t3b').trim(),
+        T4:     _cs.getPropertyValue('--tier-t4').trim(),
+      };
       const dtotal = d.tiers.reduce((s,t)=>s+Math.max(0,t.amount),0)||1;
       const R=54,CX=70,CY=70,SW=24,C=2*Math.PI*R;
       let segs='',doff=0;
@@ -2632,6 +2689,7 @@ function render(d) {
   const _waterfallData = buildWaterfallData(_history);
   const _rates = _history.length >= 2 ? computeRates(_history) : null;
   renderMilestones(d, _waterfallData, _rates, document.getElementById('milestoneContainer'));
+  renderSWRCard(d, document.getElementById('swrContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
@@ -2655,7 +2713,7 @@ function render(d) {
     document.getElementById('tabProj').classList.add('active');
   });
 
-  renderProjection(d, _history);
+  renderProjection(d, _history, _rates);
 
   function bindHoldingsEvents() {
     // Sort
