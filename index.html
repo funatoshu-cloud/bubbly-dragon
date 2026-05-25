@@ -918,7 +918,10 @@ function renderNWPulse(history, d, container) {
 // ── NW Milestones ─────────────────────────────────────────────────────────────
 function renderMilestones(d, waterfallData, rates, container) {
   if (!container) return;
-  const nw = d.netFinancialAssets;
+  // Basis: total net worth (matches the projection tab's default base case line,
+  // which includes T4 property equity + mortgage paydown). Previously used NFA,
+  // which excluded T4 — caused ETA inconsistency vs the projection chart.
+  const nw = d.totalNetWorth;
   const MILESTONES = [50,100,200,300].map(m=>m*1e6);
   const next = MILESTONES.find(m => m > nw);
   const prev = [...MILESTONES].reverse().find(m => m <= nw) || 0;
@@ -927,19 +930,14 @@ function renderMilestones(d, waterfallData, rates, container) {
   const pct = prev < next ? (nw - prev) / (next - prev) * 100 : 100;
   const remaining = next - nw;
 
-  // ETA: use same projectBucket formula as projection tab base case (NFA buckets only, excludes T4)
-  const NFA_KEYS = ['t1_index','t2','t3a_ideco','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
+  // ETA: reuse buildProjection() so the math is identical to the projection tab base case.
+  // 50-year horizon, contributions never stop within that window.
   let monthsTo = null;
   if (rates) {
-    for (let m = 1; m <= 600; m++) {
-      let projNFA = 0;
-      for (const key of NFA_KEYS) {
-        const r = rates[key];
-        if (!r) continue;
-        projNFA += projectBucket(r.currentValue, r.monthlyContrib, r.annualBase, m);
-      }
-      if (projNFA >= next) { monthsTo = m; break; }
-    }
+    const HORIZON = 600;
+    const proj = buildProjection(rates, HORIZON, HORIZON);
+    const hit = proj.find(p => p.base >= next);
+    if (hit) monthsTo = hit.month;
   }
   const timeStr = monthsTo
     ? monthsTo < 12 ? `約${monthsTo}ヶ月` : `約${Math.floor(monthsTo/12)}年${monthsTo%12?monthsTo%12+'ヶ月':''}`
@@ -949,7 +947,7 @@ function renderMilestones(d, waterfallData, rates, container) {
   container.innerHTML = `<div class="card" style="padding:12px 16px">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:baseline;gap:8px">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">純金融資産 次のマイルストーン</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">純資産 次のマイルストーン</span>
         <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">¥${fmtM(next)}</span>
       </div>
       <div style="font-size:12px;color:var(--muted);text-align:right">
