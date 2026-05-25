@@ -80,6 +80,11 @@ a { color: var(--blue); }
 .page-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); border-radius: 5px; width: 28px; height: 26px; padding: 0; cursor: pointer; font-size: 16px; font-weight: 600; line-height: 1; display: inline-flex; align-items: center; justify-content: center; transition: background .15s, color .15s, border-color .15s; }
 .page-btn:hover:not(:disabled) { background: var(--surface); color: var(--text); border-color: rgba(255,255,255,0.15); }
 .page-btn:disabled { opacity: .35; cursor: default; }
+/* Keyboard focus rings — only shown for keyboard nav, not mouse clicks */
+button:focus-visible, .tab:focus-visible, .hchart-period:focus-visible, .page-btn:focus-visible, .ai-fb-btn:focus-visible, .proj-select:focus-visible, .proj-number:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+input[type=range]:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Tactile press feedback on interactive elements */
+.btn:active:not(:disabled), .page-btn:active:not(:disabled), .tab:active, .hchart-period:active, .ai-fb-btn:active:not(:disabled) { transform: scale(0.96); transition: transform 0.08s ease; }
 
 /* Section titles */
 h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 18px 0 8px; border-left: 2px solid var(--blue); padding-left: 8px; }
@@ -109,7 +114,7 @@ h2 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacin
 .hchart-period { background: none; border: none; color: var(--muted); font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px; cursor: pointer; letter-spacing: .04em; }
 .hchart-period.active { background: var(--surface2); color: var(--text); }
 .hchart-svg { display: block; width: 100%; overflow: visible; }
-.hchart-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:7px 10px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+.chart-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:8px 11px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
 
 /* Leverage */
 .lev-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -209,13 +214,20 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 .fire-swr-label { color:var(--muted); }
 .fire-swr-vals { font-variant-numeric:tabular-nums; font-weight:600; }
 .fire-swr-vals .sep { color:var(--muted); margin:0 6px; font-weight:400; }
+.pulse-card { padding:12px 16px; margin-bottom:10px; }
+.pulse-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:10px; }
+.pulse-row { display:flex; align-items:baseline; gap:8px; padding:4px 0; font-size:12px; flex-wrap:wrap; }
+.pulse-label { color:var(--muted); min-width:90px; flex-shrink:0; }
+.pulse-val { font-variant-numeric:tabular-nums; font-weight:700; }
+.pulse-sub { font-size:11px; color:var(--muted); }
+.pulse-vel { font-variant-numeric:tabular-nums; }
+.pulse-vel b { font-weight:700; margin-left:2px; }
 
 /* Waterfall chart */
 .wfall-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px 16px 12px; margin-bottom:10px; position:relative; }
 .wfall-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:8px; }
 .wfall-legend-item { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
 .wfall-legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
-.wfall-tip { display:none; position:absolute; background:#161e2c; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:8px 11px; font-size:12px; color:#dde4ee; pointer-events:none; white-space:nowrap; z-index:20; box-shadow:0 4px 16px rgba(0,0,0,0.5); }
 
 /* Mortgage simulator */
 .msim-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px; }
@@ -278,7 +290,7 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 .top-metric { background: var(--surface); padding: 12px 14px; min-height: 62px; display: flex; flex-direction: column; justify-content: center; }
 .top-metric-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-metric-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
-.top-metric-sub { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.top-metric-sub { font-size: 11px; font-weight: 400; color: inherit; opacity: 0.65; margin-left: 4px; }
 
 /* Equation row */
 
@@ -748,7 +760,7 @@ function setupChartInteraction(projData) {
   if(tip) tip.remove();
   tip=document.createElement('div');
   tip.id='chartTip';
-  tip.style.cssText='display:none;position:absolute;background:#161e2c;border:1px solid rgba(255,255,255,0.12);border-radius:7px;padding:9px 12px;font-size:12px;color:#dde4ee;pointer-events:none;white-space:nowrap;z-index:20;box-shadow:0 4px 16px rgba(0,0,0,0.5)';
+  tip.className='chart-tip';
   pChart.appendChild(tip);
 
   const lookup=new Map(projData.map(p=>[p.month,p]));
@@ -815,6 +827,92 @@ function setupChartInteraction(projData) {
   ov.addEventListener('touchend', ()=>{
     setTimeout(hide, 1200);
   });
+}
+
+// ── NW Pulse (history-derived highlights: ATH, best/worst day, milestone streak, velocity) ──
+function renderNWPulse(history, d, container) {
+  if (!container) return;
+  if (!history || history.length < 2) { container.innerHTML = ''; return; }
+  function rowNW(r) {
+    return (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t4_land||0)+(r.t4_building||0)-(r.t4_mortgage||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
+  }
+  const series = history.map(r => ({ date: r.date, nw: rowNW(r) })).filter(r => r.nw);
+  if (series.length < 2) { container.innerHTML = ''; return; }
+  const now = new Date();
+  const daysSince = (dt) => Math.floor((now - dt) / 86400000);
+  const fmtDate = (dt) => dt.toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
+  const fmtShort = (dt) => dt.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+  const fmtVel = (v) => v === null ? '—' : (v >= 0 ? '+' : '−') + '¥' + (Math.abs(v) >= 1e6 ? (Math.abs(v)/1e6).toFixed(2) + 'M' : Math.round(Math.abs(v)/1000) + 'K');
+
+  // 1. All-time high
+  const ath = series.reduce((a, r) => r.nw > a.nw ? r : a, series[0]);
+  const athDays = daysSince(ath.date);
+  const athStr = athDays === 0 ? '今日' : `${athDays}日前`;
+
+  // 2. Best/worst single-day Δ in last 30 days
+  const cutoff30 = new Date(now - 30*86400000);
+  const recent = series.filter(r => r.date >= cutoff30);
+  let best = null, worst = null;
+  for (let i = 1; i < recent.length; i++) {
+    const delta = recent[i].nw - recent[i-1].nw;
+    if (!best || delta > best.d) best = { d: delta, date: recent[i].date };
+    if (!worst || delta < worst.d) worst = { d: delta, date: recent[i].date };
+  }
+  const hasMoves = best && worst && (best.d !== 0 || worst.d !== 0);
+
+  // 3. Milestone streak — how long current NW has been continuously above the highest crossed milestone
+  const MILESTONES = [50, 100, 200, 300].map(m => m * 1e6);
+  const latestNW = series[series.length - 1].nw;
+  const currentMilestone = [...MILESTONES].reverse().find(m => latestNW >= m);
+  let streakRow = '';
+  if (currentMilestone) {
+    // Walk backward from the end: find the most recent row where NW dipped below the milestone
+    let streakStart = series[0].date;
+    for (let i = series.length - 1; i >= 0; i--) {
+      if (series[i].nw < currentMilestone) {
+        streakStart = series[i+1] ? series[i+1].date : series[i].date;
+        break;
+      }
+      streakStart = series[i].date;
+    }
+    const streakDays = daysSince(streakStart);
+    streakRow = `<div class="pulse-row"><span class="pulse-label">¥${(currentMilestone/1e6).toFixed(0)}M ライン</span><span>突破から <span class="pulse-val" style="color:var(--green)">${streakDays}日連続</span></span><span class="pulse-sub">(${fmtDate(streakStart)})</span></div>`;
+  }
+
+  // 4. NW velocity over rolling 3/6/12 months (¥/month)
+  function velocityForMonths(n) {
+    const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - n);
+    const startRow = series.find(r => r.date >= cutoff);
+    if (!startRow) return null;
+    const days = (now - startRow.date) / 86400000;
+    if (days < 1) return null;
+    const delta = latestNW - startRow.nw;
+    return delta / (days / 30.44);
+  }
+  const v3 = velocityForMonths(3), v6 = velocityForMonths(6), v12 = velocityForMonths(12);
+  const velColor = (v) => v === null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)');
+
+  container.innerHTML = `<div class="card pulse-card">
+    <div class="pulse-title">純資産ハイライト</div>
+    <div class="pulse-row">
+      <span class="pulse-label">史上最高値</span>
+      <span class="pulse-val">${fmt(ath.nw)}</span>
+      <span class="pulse-sub">${fmtDate(ath.date)} · ${athStr}</span>
+    </div>
+    ${hasMoves ? `<div class="pulse-row">
+      <span class="pulse-label">直近30日</span>
+      <span class="pulse-val" style="color:var(--green)">▲ ${fmtVel(best.d)}</span><span class="pulse-sub">${fmtShort(best.date)}</span>
+      <span class="pulse-val" style="color:var(--red);margin-left:10px">▼ ${fmtVel(worst.d)}</span><span class="pulse-sub">${fmtShort(worst.date)}</span>
+    </div>` : ''}
+    ${streakRow}
+    <div class="pulse-row">
+      <span class="pulse-label">ペース</span>
+      <span class="pulse-vel">3M <b style="color:${velColor(v3)}">${fmtVel(v3)}</b></span>
+      <span class="pulse-vel">6M <b style="color:${velColor(v6)}">${fmtVel(v6)}</b></span>
+      <span class="pulse-vel">12M <b style="color:${velColor(v12)}">${fmtVel(v12)}</b></span>
+      <span class="pulse-sub">/月</span>
+    </div>
+  </div>`;
 }
 
 // ── NW Milestones ─────────────────────────────────────────────────────────────
@@ -1290,7 +1388,7 @@ function renderAISummary(d, waterfallData, container) {
         <span>AI サマリー</span>
         <span id="aiChevron" style="font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0">&rsaquo;</span>
       </div>
-      <div id="aiPreview" style="font-size:12px;font-weight:400;color:var(--muted);margin-top:3px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${previewText}</div>
+      <div id="aiPreview" style="font-size:12px;font-weight:400;color:var(--muted);margin-top:3px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${previewText}</div>
     </h2>
     <div id="aiBody" style="display:none">
       <div class="ai-card">
@@ -1602,7 +1700,7 @@ function renderWaterfallChart(history, container) {
       <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.mortgage}"></div>ローン返済</div>
       <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.rePos}"></div>不動産変動</div>
     </div>
-    <div id="wfTip" class="wfall-tip"></div>
+    <div id="wfTip" class="chart-tip"></div>
   </div>`;
 
   container.style.position='relative';
@@ -1655,7 +1753,10 @@ function renderPassiveIncomeChart(history, d, container) {
     monthMap.set(key, r.passive_income);
   }
   const data = [...monthMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-24);
-  if (!data.length) { container.innerHTML = ''; return; }
+  if (!data.length) {
+    container.innerHTML = `<div class="wfall-card" style="color:var(--muted);font-size:12px;text-align:center;padding:30px 16px">パッシブ収入の履歴データがまだありません</div>`;
+    return;
+  }
 
   const target = d.passiveIncomeTarget || 0;
   const W=800, H=180, PL=68, PR=20, PT=14, PB=36;
@@ -1707,7 +1808,7 @@ function renderPassiveIncomeChart(history, d, container) {
     <svg id="piSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
       ${grid}${yLbl}${targetLine}${bars}${hair}${overlay}
     </svg>
-    <div id="piTip" class="wfall-tip"></div>
+    <div id="piTip" class="chart-tip"></div>
   </div>`;
 
   // Hover
@@ -1780,7 +1881,7 @@ function renderMortgageSimulator(d, container) {
   }
 
   container.innerHTML=`
-    <h2 id="msimToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none">
+    <h2 id="msimToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;padding:8px 0;margin-top:10px;margin-bottom:0">
       住宅ローンシミュレーター
       <span id="msimChevron" style="font-size:9px;color:var(--muted);transition:transform .2s;display:inline-block">▶</span>
     </h2>
@@ -1910,7 +2011,7 @@ function buildHistoryChart(history, period) {
   ${costLine}
   <polyline points="${nwPts}" fill="none" stroke="${lineColor}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
   ${xLbls}${hairline}${dot}${overlayRect}
-  </svg><div id="hcTip" class="hchart-tip"></div>`;
+  </svg><div id="hcTip" class="chart-tip"></div>`;
 
   // Serialise data for interaction — pass minV/maxV so hover uses identical scaling
   return {svgStr, data, endNW, delta, pct, isGain, W, H, PL, PT, PB, cW, cH, minV, maxV};
@@ -2616,6 +2717,7 @@ function render(d) {
       <div class="section-divider">FIRE 進捗</div>
       <div id="fireBarContainer"></div>
       <div id="milestoneContainer"></div>
+      <div id="nwPulseContainer"></div>
 
       <div class="section-divider">純資産推移</div>
       <div id="historyChartContainer"></div>
@@ -2793,6 +2895,7 @@ function render(d) {
   const _waterfallData = buildWaterfallData(_history);
   const _rates = _history.length >= 2 ? computeRates(_history) : null;
   renderMilestones(d, _waterfallData, _rates, document.getElementById('milestoneContainer'));
+  renderNWPulse(_history, d, document.getElementById('nwPulseContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
