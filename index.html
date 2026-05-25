@@ -529,7 +529,10 @@ function projectBucket(currentVal, monthlyContrib, annualRate, months) {
   return currentVal*g+monthlyContrib*(g-1)/r;
 }
 
-// Stress test: simulate an immediate -30% drop on investment buckets in month 0, then recover at base rate
+// Stress test: -30% drop on investment buckets in month 0, then compound at
+// the PESSIMISTIC rate (base − σ) for the rest of the horizon. Using base − σ
+// (not the median base rate) ensures the stress line stays at-or-below
+// pessimistic — a genuine worst case (bad year 1 + poor ongoing returns).
 const SHOCK_BUCKETS = new Set(['t1_index','t2','t3a_ideco']);
 const SHOCK = 0.70;  // -30%
 
@@ -553,7 +556,10 @@ function buildProjection(rates, months, stopMonths) {
         const t4Base=projectBucket(r._propertyValue,0,r.annualBase,              m)-mortFV;
         const t4Opt =projectBucket(r._propertyValue,0,r.annualBase+r.annualSigma,m)-mortFV;
         const t4Pess=projectBucket(r._propertyValue,0,r.annualBase-r.annualSigma,m)-mortFV;
-        base+=t4Base; opt+=t4Opt; pess+=t4Pess; stress+=t4Base;
+        base+=t4Base; opt+=t4Opt; pess+=t4Pess;
+        // Stress for T4: assume property holds its base trajectory (real estate
+        // doesn't crash 30% on an equity shock), so use pessimistic rate to be safe
+        stress+=t4Pess;
         continue;
       }
       const contrib = (m <= stopMonths) ? r.monthlyContrib : 0;
@@ -565,11 +571,16 @@ function buildProjection(rates, months, stopMonths) {
       // Pessimistic — floor cap
       const pessRaw=projectBucket(r.currentValue,contrib,r.annualBase-r.annualSigma,m);
       pess +=applyValueCap(pessRaw, r.currentValue, contrib, m, stopMonths, key, 'down');
-      // Stress — shock starting value on investment buckets, base-rate compounding, floor cap
+      // Stress — shock investment buckets in month 0, then compound at PESSIMISTIC rate
+      // (base − σ), so stress is genuinely the worst path, not just a bad start with
+      // average ongoing returns. Floor cap still applies.
       const stressStart = SHOCK_BUCKETS.has(key) ? r.currentValue * SHOCK : r.currentValue;
-      const stressRaw=projectBucket(stressStart,contrib,r.annualBase,m);
+      const stressRaw=projectBucket(stressStart,contrib,r.annualBase-r.annualSigma,m);
       stress +=applyValueCap(stressRaw, stressStart, contrib, m, stopMonths, key, 'down');
     }
+    // Defensive: ensure stress is never above pessimistic (shouldn't be possible
+    // now, but value caps + heterogeneous buckets could create edge cases)
+    stress = Math.min(stress, pess);
     result.push({month:m,base,optimistic:opt,pessimistic:pess,stress});
   }
   return result;
@@ -1806,7 +1817,7 @@ function buildHistoryChart(history, period) {
     const costInRange=costPts.some(r=>r.cost>=minV && r.cost<=maxV);
     if(costInRange){
       const cpStr=data.map((r,i)=>(r.cost>0 && r.cost>=minV && r.cost<=maxV)?`${xs(i).toFixed(1)},${ys(r.cost).toFixed(1)}`:null).filter(Boolean).join(' ');
-      if(cpStr) costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
+      if(cpStr) costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="1" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
     }
   }
 
@@ -1826,16 +1837,16 @@ function buildHistoryChart(history, period) {
   // Interactive overlay
   const overlayRect=`<rect id="hcOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
   const hairline=`<line id="hcHair" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
-  const dot=`<circle id="hcDot" r="4" fill="${lineColor}" stroke="#0a0c13" stroke-width="2" visibility="hidden"/>`;
+  const dot=`<circle id="hcDot" r="3.5" fill="${lineColor}" stroke="#0a0c13" stroke-width="1.5" visibility="hidden"/>`;
 
   const svgStr=`<svg id="hcSvg" class="hchart-svg" viewBox="0 0 ${W} ${H}">
   <defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.25"/>
+    <stop offset="0%" stop-color="${lineColor}" stop-opacity="0.22"/>
     <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.02"/>
   </linearGradient></defs>
   <polygon points="${fillPts}" fill="url(#${gradId})"/>
   ${costLine}
-  <polyline points="${nwPts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="${nwPts}" fill="none" stroke="${lineColor}" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
   ${xLbls}${hairline}${dot}${overlayRect}
   </svg><div id="hcTip" class="hchart-tip"></div>`;
 
@@ -2058,7 +2069,7 @@ function renderProjection(d, history, precomputedRates) {
       <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>Optimistic</span>
       <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>Base</span>
       <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#f85149"/></svg>Pessimistic</span>
-      <span title="-30% drop on T1 index, T2 stocks, T3a iDeCo in year 1, then base-rate recovery" style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="rgba(139,148,158,0.85)" stroke-width="2" stroke-dasharray="2,3"/></svg>Worst case</span>
+      <span title="-30% shock to T1 index, T2 stocks, T3a iDeCo in year 1, then compound at pessimistic rate (base − σ) — worst-case scenario" style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="rgba(139,148,158,0.85)" stroke-width="2" stroke-dasharray="2,3"/></svg>Worst case</span>
       <span id="pLegendCoast" style="display:none;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/></svg>Coast FIRE</span>
     </div>
     <div class="card" style="padding:6px 6px 0"><div id="pChart"></div><div id="pAnnotation" style="padding:4px 6px 8px;font-size:12px"></div></div>
