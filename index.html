@@ -918,10 +918,7 @@ function renderNWPulse(history, d, container) {
 // ── NW Milestones ─────────────────────────────────────────────────────────────
 function renderMilestones(d, waterfallData, rates, container) {
   if (!container) return;
-  // Basis: total net worth (matches the projection tab's default base case line,
-  // which includes T4 property equity + mortgage paydown). Previously used NFA,
-  // which excluded T4 — caused ETA inconsistency vs the projection chart.
-  const nw = d.totalNetWorth;
+  const nw = d.netFinancialAssets;
   const MILESTONES = [50,100,200,300].map(m=>m*1e6);
   const next = MILESTONES.find(m => m > nw);
   const prev = [...MILESTONES].reverse().find(m => m <= nw) || 0;
@@ -930,14 +927,19 @@ function renderMilestones(d, waterfallData, rates, container) {
   const pct = prev < next ? (nw - prev) / (next - prev) * 100 : 100;
   const remaining = next - nw;
 
-  // ETA: reuse buildProjection() so the math is identical to the projection tab base case.
-  // 50-year horizon, contributions never stop within that window.
+  // ETA: use same projectBucket formula as projection tab base case (NFA buckets only, excludes T4)
+  const NFA_KEYS = ['t1_index','t2','t3a_ideco','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
   let monthsTo = null;
   if (rates) {
-    const HORIZON = 600;
-    const proj = buildProjection(rates, HORIZON, HORIZON);
-    const hit = proj.find(p => p.base >= next);
-    if (hit) monthsTo = hit.month;
+    for (let m = 1; m <= 600; m++) {
+      let projNFA = 0;
+      for (const key of NFA_KEYS) {
+        const r = rates[key];
+        if (!r) continue;
+        projNFA += projectBucket(r.currentValue, r.monthlyContrib, r.annualBase, m);
+      }
+      if (projNFA >= next) { monthsTo = m; break; }
+    }
   }
   const timeStr = monthsTo
     ? monthsTo < 12 ? `約${monthsTo}ヶ月` : `約${Math.floor(monthsTo/12)}年${monthsTo%12?monthsTo%12+'ヶ月':''}`
@@ -947,7 +949,7 @@ function renderMilestones(d, waterfallData, rates, container) {
   container.innerHTML = `<div class="card" style="padding:12px 16px">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:baseline;gap:8px">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">純資産 次のマイルストーン</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">純金融資産 次のマイルストーン</span>
         <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">¥${fmtM(next)}</span>
       </div>
       <div style="font-size:12px;color:var(--muted);text-align:right">
@@ -2216,11 +2218,13 @@ function renderProjection(d, history, precomputedRates) {
         <span class="proj-label">NW target (¥)</span>
         <input type="number" id="pTarget" class="proj-number" placeholder="e.g. 100000000" step="1000000">
       </div>
-      <div class="proj-group" style="justify-content:flex-end">
-        <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;color:var(--muted)">
-          <input type="checkbox" id="pExcludeRE" style="accent-color:var(--blue);cursor:pointer">
-          Exclude real estate (mortgage as liability)
-        </label>
+      <div class="proj-group">
+        <span class="proj-label">Scope</span>
+        <select id="pScope" class="proj-select">
+          <option value="total">純資産合計 (Total NW)</option>
+          <option value="nfa">純金融資産 (NFA, T4 除外)</option>
+          <option value="excludeRE">不動産除外 (mortgage as liability)</option>
+        </select>
       </div>
     </div>
     <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
@@ -2255,7 +2259,9 @@ function renderProjection(d, history, precomputedRates) {
     const stopDate=document.getElementById('pStopDate')?.value||'';
     const stopMonths=Math.max(0, monthsFromNow(stopDate));
     const target=parseFloat((document.getElementById('pTarget').value||'0').replace(/[¥,]/g,''))||0;
-    const excludeRE=document.getElementById('pExcludeRE')?.checked||false;
+    const scope=document.getElementById('pScope')?.value||'total';
+    const excludeRE=scope==='excludeRE';
+    const nfaOnly=scope==='nfa';
     const months=yrs*12;
     document.getElementById('pHL').textContent=yrs+' year'+(yrs!==1?'s':'');
     document.getElementById('pManual').style.display=mode==='manual'?'block':'none';
@@ -2280,13 +2286,18 @@ function renderProjection(d, history, precomputedRates) {
                _paydownStartOffset:r?r._paydownStartOffset:undefined};
     }
 
-    // RE exclusion: replace T4 equity with mortgage-as-liability (linear paydown)
-    if(excludeRE){
+    // Scope-specific T4 handling
+    if(nfaOnly){
+      // NFA: drop T4 entirely (no property, no mortgage liability)
+      delete pr.t4;
+    } else if(excludeRE){
+      // Exclude RE: replace T4 equity with mortgage-as-liability (linear paydown)
       const mortBal=(rates&&rates.t4&&rates.t4._mortgageBalance)||
                     (history.length?history[history.length-1].t4_mortgage||0:0);
       const monthlyPaydown=(rates&&rates.t4&&rates.t4._monthlyPaydown)||0;
       pr.t4={annualBase:0,annualSigma:0,monthlyContrib:0,currentValue:-mortBal,_isLinearPaydown:true,_monthlyPaydown:monthlyPaydown};
     }
+    // Total NW: pr.t4 keeps its default (property - mortgage) handling
 
     if(!Object.values(pr).some(r=>r.currentValue!==0)){
       document.getElementById('pChart').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No data available yet.</p>';
@@ -2299,11 +2310,11 @@ function renderProjection(d, history, precomputedRates) {
     // Annotations
     let ann='';
     if(excludeRE){
-      // Find when NFA crosses zero (net of mortgage)
+      // Find when (NFA - mortgage) crosses zero
       const crossZero=projData.find(p=>p.base>=0);
       ann=crossZero
-        ?`<span style="font-size:12px;color:var(--green)">純金融資産 net zero reached in ${Math.floor(crossZero.month/12)}y ${crossZero.month%12}m</span>`
-        :`<span style="font-size:12px;color:var(--muted)">純金融資産 net zero not reached within ${yrs} years</span>`;
+        ?`<span style="font-size:12px;color:var(--green)">住宅ローン完済+純金融資産 net zero in ${Math.floor(crossZero.month/12)}y ${crossZero.month%12}m</span>`
+        :`<span style="font-size:12px;color:var(--muted)">net zero not reached within ${yrs} years</span>`;
     } else if(target>0){
       const hit=projData.find(p=>p.base>=target);
       ann=hit?`<span style="font-size:12px;color:var(--green)">📈 Base reaches target in ${Math.floor(hit.month/12)}y ${hit.month%12}m</span>`
@@ -2315,7 +2326,7 @@ function renderProjection(d, history, precomputedRates) {
 
     // Coast FIRE curve: NW needed at month m to reach fireNumber by retirement without contributions
     let coastCurve = null;
-    if(d.fireNumber > 0 && d.retirementAge > 0 && d.currentAge > 0 && !excludeRE) {
+    if(d.fireNumber > 0 && d.retirementAge > 0 && d.currentAge > 0 && !excludeRE) {  // coast FIRE meaningful for total/nfa modes
       const yearsToRetire = d.retirementAge - d.currentAge;
       const totalRetireMonths = yearsToRetire * 12;
       // Use base annual return across all buckets (weighted by current value)
@@ -2365,7 +2376,8 @@ function renderProjection(d, history, precomputedRates) {
       const rowLabel=excludeRE&&key==='t4'?'T4 Mortgage (liability)':label;
       return `<tr><td>${rowLabel}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">${cap?'+'+fmt(cap):'—'}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${r._isLinearPaydown?'linear paydown':(r.annualBase*100).toFixed(1)+'%'}</td></tr>`;
     }).join('');
-    document.getElementById('pTfoot').innerHTML=`<td>Total (${excludeRE?'純金融資産':'NW'})</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
+    const footerLabel = nfaOnly ? '純金融資産 (NFA)' : excludeRE ? 'NFA − 住宅ローン' : '純資産合計 (NW)';
+    document.getElementById('pTfoot').innerHTML=`<td>Total (${footerLabel})</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
   }
 
   // Track whether user has manually overridden the stop date
@@ -2382,7 +2394,7 @@ function renderProjection(d, history, precomputedRates) {
     rebuild();
   });
 
-  ['pContrib','pStopDate','pTarget','pExcludeRE'].forEach(id=>{
+  ['pContrib','pStopDate','pTarget','pScope'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     el.addEventListener('input',rebuild); el.addEventListener('change',rebuild);
   });
