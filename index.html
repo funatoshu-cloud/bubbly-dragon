@@ -416,29 +416,65 @@ function applyValueCap(projectedVal, currentVal, monthlyContrib, months, stopMon
   return projectedVal;
 }
 
+// Time-weighted return helper — chains sub-period returns geometrically,
+// annualizes via Math.pow(TWR, 365/days), then shrinks toward zero when
+// history is short so noise doesn't extrapolate to absurd annual rates.
+//
+// Why TWR instead of arrMedian × 252:
+//   - Median × 252 was wildly unstable: 1 slightly-positive median day → 100%+/yr
+//   - TWR uses ACTUAL elapsed time, not "if every day looked like the median"
+//   - Outlier filter on per-period returns catches contributions misclassified as returns
+//   - Shrinkage prevents 30 days of data from claiming to predict 1 full year
+function bucketRate(history, vCol, cCol, perPeriodCap, annDays) {
+  const subReturns=[];
+  let firstDate=null, lastDate=null, twr=1, pv=null, pc=null;
+  for (const row of history) {
+    const v=row[vCol];
+    if (v===null) continue;
+    const c=cCol ? (row[cCol]??0) : 0;
+    if (pv!==null && pv>0 && v!==pv) {
+      // Pure return ratio: cost-tracked excludes contributions, no-cost includes them
+      const ret = cCol ? ((v-c)-(pv-pc))/pv : (v-pv)/pv;
+      // Per-period cap: anything bigger is a contribution/withdrawal/data error, not a return
+      if (isFinite(ret) && Math.abs(ret)<=perPeriodCap) {
+        twr*=(1+ret);
+        subReturns.push(ret);
+      }
+    }
+    if (firstDate===null) firstDate=row.date;
+    lastDate=row.date;
+    pv=v; pc=c;
+  }
+  if (firstDate===null || subReturns.length<2) return { annualBase:0, annualSigma:0 };
+  const days=Math.max(1,(lastDate-firstDate)/(1000*60*60*24));
+  let annualBase=Math.pow(twr, 365/days)-1;
+  // Shrink toward 0 when history < 180 days (uncertain extrapolation)
+  const shrinkFactor=Math.min(1, days/180);
+  annualBase*=shrinkFactor;
+  const annualSigma=arrStddev(subReturns)*Math.sqrt(annDays);
+  return { annualBase, annualSigma };
+}
+
 function computeRates(history) {
   if (history.length < 2) return null;
   const rates = {};
+  const last = history[history.length-1];
 
   // Investment buckets: daily value + cost tracking
+  // perPeriodCap=5% (typical max legitimate single-day move), annDays=252 trading days
   for (const [key, vCol, cCol] of [['t1_index','t1_index_value','t1_index_cost'],['t2','t2_value','t2_cost'],['t3a_ideco','t3a_ideco_value','t3a_ideco_cost']]) {
-    const dailyReturns=[], monthlyContribs=[];
-    let pv=null,pc=null,pm=null;
+    const r=bucketRate(history, vCol, cCol, 0.05, 252);
+    // Monthly contributions — track Δcost when month rolls over and cost increased
+    const monthlyContribs=[];
+    let pm=null, pc=null;
     for (const row of history) {
-      const v=row[vCol], c=row[cCol];
-      if (v!==null && c!==null && pv!==null && pc!==null && pv>0 && v!==pv) {
-        // Pure investment return: Δ(value-cost) / prev_value
-        dailyReturns.push(((v-c)-(pv-pc))/pv);
-      }
-      const rm = row.date.getFullYear()*12+row.date.getMonth();
+      const c=row[cCol];
+      const rm=row.date.getFullYear()*12+row.date.getMonth();
       if (pm!==null && rm!==pm && pc!==null && c!==null && c>pc) monthlyContribs.push(c-pc);
-      if (v!==null) pv=v; if (c!==null) pc=c; pm=rm;
+      if (c!==null) pc=c; pm=rm;
     }
-    const med=arrMedian(dailyReturns), sd=arrStddev(dailyReturns);
-    const filt=dailyReturns.filter(r=>Math.abs(r-med)<=3*sd);
-    const last=history[history.length-1];
-    const b=clampRate(arrMedian(filt)*252, RATE_CAP.base);
-    const s=clampRate(arrStddev(filt)*Math.sqrt(252), RATE_CAP.sigma);
+    const b=clampRate(r.annualBase, RATE_CAP.base);
+    const s=clampRate(r.annualSigma, RATE_CAP.sigma);
     rates[key]={ annualBase:b.v, annualSigma:s.v, _baseClamped:b.clamped, _sigmaClamped:s.clamped, monthlyContrib:arrMedian(monthlyContribs)||0, currentValue:last[vCol]||0 };
   }
 
@@ -446,36 +482,33 @@ function computeRates(history) {
   const mortDeltas=[];
   for (let i=1;i<history.length;i++) { const d=history[i].t4_mortgage-history[i-1].t4_mortgage; if(d<0) mortDeltas.push(Math.abs(d)); }
   let typicalPmt=arrMedian(mortDeltas)||0;
-  // Bootstrap monthly principal from amortization formula when no payment history yet
-  const last=history[history.length-1];
   if (typicalPmt < 1000 && (last.t4_mortgage||0) > 0) {
     const mr=MORTGAGE_RATE/12, n=MORTGAGE_TERM_YEARS*12, bal=last.t4_mortgage;
     const fullPmt=bal*mr/(1-Math.pow(1+mr,-n));
-    typicalPmt=fullPmt-bal*mr; // principal portion only
+    typicalPmt=fullPmt-bal*mr;
   }
-  // Rate = property appreciation only (Δ(land+building)/(land+building)) — never mix in paydown
-  const t4Returns=[];
-  for (let i=1;i<history.length;i++) {
-    const p=history[i-1],c=history[i];
-    if([p.t4_land,p.t4_building,c.t4_land,c.t4_building].some(v=>v===null)) continue;
-    const prop0=p.t4_land+p.t4_building, prop1=c.t4_land+c.t4_building;
-    if(prop0>0 && prop0!==prop1) t4Returns.push((prop1-prop0)/prop0);
-  }
-  const t4Med=arrMedian(t4Returns), t4Sd=arrStddev(t4Returns);
-  const t4Filt=t4Returns.filter(r=>Math.abs(r-t4Med)<=3*t4Sd);
-  // Paydown starts June 1 2026; offset = months from today (clamped ≥ 0)
+  // T4 property appreciation — TWR over land+building, no contributions
+  // perPeriodCap=5% (property doesn't move >5% in a single day), annDays=365 calendar
+  const t4History=history.map(r => ({
+    date: r.date,
+    _t4_prop: (r.t4_land!==null && r.t4_building!==null) ? r.t4_land+r.t4_building : null
+  }));
+  const t4r=bucketRate(t4History, '_t4_prop', null, 0.05, 365);
   const _paydownStartOffset=Math.max(0,Math.round((new Date('2026-06-01')-new Date())/(1000*60*60*24*30.44)));
   const _propValue=(last.t4_land||0)+(last.t4_building||0);
-  const t4b=clampRate(arrMedian(t4Filt)*365||0, RATE_CAP.base);
-  const t4s=clampRate(arrStddev(t4Filt)*Math.sqrt(365)||0, RATE_CAP.sigma);
+  const t4b=clampRate(t4r.annualBase, RATE_CAP.base);
+  const t4s=clampRate(t4r.annualSigma, RATE_CAP.sigma);
   rates.t4={ annualBase:t4b.v, annualSigma:t4s.v, _baseClamped:t4b.clamped, _sigmaClamped:t4s.clamped, monthlyContrib:typicalPmt, currentValue:_propValue-(last.t4_mortgage||0), _propertyValue:_propValue, _mortgageBalance:last.t4_mortgage||0, _monthlyPaydown:typicalPmt, _paydownStartOffset };
 
-  // Monthly buckets: simple ΔV/V
+  // No-cost buckets — forward-filled monthly cadence (changes only on first-of-month)
+  // perPeriodCap=15% per period catches normal monthly changes but flags contribution-sized jumps
+  // annDays=12 because effective sampling is monthly
+  // Note: contributions/withdrawals to t0/HYSA still get treated as "returns" since there's no
+  // cost tracking — the 15% cap helps but doesn't perfectly separate them
   for (const [key,col] of [['t0','t0_value'],['t1_hysa','t1_hysa'],['t1_gold','t1_gold'],['t3a_insurance','t3a_insurance'],['t3b','t3b_value']]) {
-    const returns=[]; let prev=null;
-    for (const row of history) { const v=row[col]; if(v!==null){if(prev!==null&&prev>0&&v!==prev) returns.push((v-prev)/prev); prev=v;} }
-    const b=clampRate(arrMedian(returns)*12, RATE_CAP.base);
-    const s=clampRate(arrStddev(returns)*Math.sqrt(12), RATE_CAP.sigma);
+    const r=bucketRate(history, col, null, 0.15, 12);
+    const b=clampRate(r.annualBase, RATE_CAP.base);
+    const s=clampRate(r.annualSigma, RATE_CAP.sigma);
     rates[key]={ annualBase:b.v, annualSigma:s.v, _baseClamped:b.clamped, _sigmaClamped:s.clamped, monthlyContrib:0, currentValue:last[col]||0 };
   }
   return rates;
