@@ -1777,9 +1777,16 @@ function buildHistoryChart(history, period) {
   const W=800, H=180, PL=0, PR=0, PT=10, PB=28;
   const cW=W-PL-PR, cH=H-PT-PB;
   const n=data.length;
-  const nwVals=data.map(r=>r.nw), costVals=data.map(r=>r.cost);
-  const allVals=[...nwVals,...costVals.filter(v=>v>0)];
-  const minV=Math.min(...allVals)*0.995, maxV=Math.max(...allVals)*1.005;
+  const nwVals=data.map(r=>r.nw);
+
+  // Y-axis: scale tightly to NW range so daily movements are visible.
+  // Previous version included cost basis in the range, which compressed NW
+  // movements into a tiny band at the top of the chart (the "green/red box").
+  // Padding is range-based (8% of NW range) with a minimum so flat periods still show.
+  const nwMin=Math.min(...nwVals), nwMax=Math.max(...nwVals);
+  const rng=nwMax-nwMin;
+  const pad=Math.max(rng*0.08, Math.abs(nwMax||nwMin)*0.002, 1);
+  const minV=nwMin-pad, maxV=nwMax+pad;
   const xs=i=>PL+(i/(n-1))*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
 
   const startNW=data[0].nw, endNW=data[data.length-1].nw;
@@ -1791,12 +1798,16 @@ function buildHistoryChart(history, period) {
   // NW polyline + gradient fill
   const nwPts=data.map((r,i)=>`${xs(i).toFixed(1)},${ys(r.nw).toFixed(1)}`).join(' ');
   const fillPts=`${xs(0).toFixed(1)},${H-PB} `+nwPts+` ${xs(n-1).toFixed(1)},${H-PB}`;
-  // Cost basis line (dashed, muted)
+  // Cost basis line — only render if it falls within the NW-tightened range
+  // (don't widen Y-axis to fit it; the tooltip still shows cost on hover)
   const costPts=data.filter(r=>r.cost>0);
   let costLine='';
   if(costPts.length>=2){
-    const cpStr=data.map((r,i)=>r.cost>0?`${xs(i).toFixed(1)},${ys(r.cost).toFixed(1)}`:null).filter(Boolean).join(' ');
-    costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
+    const costInRange=costPts.some(r=>r.cost>=minV && r.cost<=maxV);
+    if(costInRange){
+      const cpStr=data.map((r,i)=>(r.cost>0 && r.cost>=minV && r.cost<=maxV)?`${xs(i).toFixed(1)},${ys(r.cost).toFixed(1)}`:null).filter(Boolean).join(' ');
+      if(cpStr) costLine=`<polyline points="${cpStr}" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,3" stroke-linejoin="round"/>`;
+    }
   }
 
   // X axis labels — smart anchoring to prevent edge clipping
@@ -1828,16 +1839,13 @@ function buildHistoryChart(history, period) {
   ${xLbls}${hairline}${dot}${overlayRect}
   </svg><div id="hcTip" class="hchart-tip"></div>`;
 
-  // Serialise data for interaction
-  return {svgStr, data, endNW, delta, pct, isGain, W, H, PL, PT, PB, cW, cH};
+  // Serialise data for interaction — pass minV/maxV so hover uses identical scaling
+  return {svgStr, data, endNW, delta, pct, isGain, W, H, PL, PT, PB, cW, cH, minV, maxV};
 }
 
 function setupHChartInteraction(info) {
-  const {data,W,H,PL,PT,PB,cW,cH} = info;
+  const {data,W,H,PL,PT,PB,cW,cH,minV,maxV} = info;
   const n=data.length;
-  const nwVals=data.map(r=>r.nw), costVals=data.map(r=>r.cost);
-  const allVals=[...nwVals,...costVals.filter(v=>v>0)];
-  const minV=Math.min(...allVals)*0.995, maxV=Math.max(...allVals)*1.005;
   const xs=i=>PL+(i/(n-1))*cW, ys=v=>PT+(1-(v-minV)/(maxV-minV))*cH;
 
   const svg=document.getElementById('hcSvg');
