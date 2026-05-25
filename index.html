@@ -54,6 +54,26 @@ a { color: var(--blue); }
 .header-title img { width: 26px; height: 26px; flex-shrink: 0; border-radius: 6px; }
 .header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; color: var(--muted); }
+.sync-badge { display:inline-flex; align-items:center; gap:6px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:3px 8px; font-size:11px; color:var(--muted); }
+.sync-dot { width:6px; height:6px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+.sync-dot.ok   { background:var(--green); }
+.sync-dot.warn { background:var(--yellow); }
+.sync-dot.fail { background:var(--red); }
+.sync-dot.syncing { background:var(--blue); animation:syncPulse 1.2s ease-in-out infinite; }
+@keyframes syncPulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+.stale-banner { background:rgba(210,153,34,0.12); border:1px solid rgba(210,153,34,0.3); color:var(--yellow); padding:8px 12px; border-radius:6px; font-size:12px; margin-bottom:10px; }
+.stale-banner code { background:rgba(0,0,0,0.25); padding:1px 5px; border-radius:3px; font-size:11px; }
+.section-divider { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin:22px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.section-divider:first-child { margin-top:8px; }
+.tier-donut { width:120px; height:120px; }
+.tier-donut-wrap { padding:14px 20px; }
+@media (max-width: 800px) {
+  .tier-donut { width:90px; height:90px; }
+  .tier-donut-wrap { padding:10px 12px; gap:6px; }
+}
+@media (max-width: 600px) {
+  .tier-donut { width:80px; height:80px; }
+}
 .btn { background: var(--green); border: none; color: #fff; border-radius: 5px; padding: 5px 12px; cursor: pointer; font-size: 11px; font-weight: 700; letter-spacing: .04em; }
 .btn:hover { opacity: .85; }
 .btn:disabled { opacity: .4; cursor: default; }
@@ -255,9 +275,10 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 
 /* Top metrics row 1 */
 .top-metrics { display: grid; grid-template-columns: repeat(6,1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
-.top-metric { background: var(--surface); padding: 10px 14px; }
-.top-metric-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.top-metric-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.top-metric { background: var(--surface); padding: 12px 14px; min-height: 62px; display: flex; flex-direction: column; justify-content: center; }
+.top-metric-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-metric-value { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.top-metric-sub { font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 4px; }
 
 /* Equation row */
 
@@ -355,6 +376,41 @@ const HISTORY_URL   = 'https://docs.google.com/spreadsheets/d/1j9az4y9uJ_hVbgFFe
 const HCOL = { t1_index_value:1,t1_index_cost:2,t2_value:3,t2_cost:4,t3a_ideco_value:5,t3a_ideco_cost:6,t4_land:7,t4_building:8,t4_mortgage:9,t0_value:10,t1_gold:11,t1_hysa:12,t3a_insurance:13,t3b_value:14,passive_income:15 };
 const MONTHLY_COLS = ['t0_value','t1_gold','t1_hysa','t3a_insurance','t3b_value','passive_income'];
 let _history = [];
+
+// Sync state — drives the sync badge in the header
+let _lastSyncedAt = null;
+let _syncStatus = 'idle';  // 'syncing' | 'ok' | 'fail' | 'idle'
+
+function updateSyncBadge() {
+  const el = document.getElementById('syncText');
+  const dot = document.querySelector('#syncBadge .sync-dot');
+  if (!el || !dot) return;
+  if (_syncStatus === 'syncing') { el.textContent='同期中…'; dot.className='sync-dot syncing'; return; }
+  if (_syncStatus === 'fail')    { el.textContent='同期失敗 · 再試行'; dot.className='sync-dot fail'; return; }
+  if (!_lastSyncedAt)            { el.textContent='—'; dot.className='sync-dot'; return; }
+  const mins = Math.floor((Date.now() - _lastSyncedAt) / 60000);
+  let txt, cls;
+  if (mins < 1)         { txt='たった今';        cls='sync-dot ok'; }
+  else if (mins < 60)   { txt=`${mins}分前`;     cls= mins<30 ? 'sync-dot ok' : 'sync-dot warn'; }
+  else                  { txt=`${Math.floor(mins/60)}時間前 · 更新推奨`; cls='sync-dot warn'; }
+  el.textContent=txt; dot.className=cls;
+}
+setInterval(updateSyncBadge, 60000);
+
+// Stale snapshot banner — warns if the most recent history row is >2 days old
+// (indicates Apps Script snapshotDaily() may be stuck or trigger broken)
+function renderStaleBanner(history) {
+  const container = document.getElementById('staleBanner');
+  if (!container) return;
+  if (!history || !history.length) { container.innerHTML=''; return; }
+  const lastDate = history[history.length-1].date;
+  const daysOld = Math.floor((Date.now() - lastDate) / (1000*60*60*24));
+  if (daysOld < 2) { container.innerHTML=''; return; }
+  const lbl = lastDate.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
+  container.innerHTML = `<div class="stale-banner">
+    ⚠ 日次スナップショットが ${daysOld} 日間更新されていません (最終: ${lbl}) — Apps Script の <code>snapshotDaily()</code> トリガーを確認してください
+  </div>`;
+}
 
 function parseHistory(rows) {
   const data = [];
@@ -616,13 +672,18 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   }
   let xLbl='';
   const totalYrs=Math.floor(months/12);
+  // Skip alternating labels when horizon is long enough that they'd overlap on narrow screens.
+  // First and last always rendered.
+  const skipEvery = totalYrs >= 20 ? 3 : (totalYrs >= 10 ? 2 : 1);
   for(let yr=0;yr<=totalYrs;yr++){
     const x=xs(yr*12);
     const isFirst=yr===0, isLast=yr===totalYrs;
+    // Always draw gridline; only draw label on selected years
+    if(yr>0) grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
+    if(!isFirst && !isLast && yr % skipEvery !== 0) continue;
     const anchor=isFirst?'start':isLast?'end':'middle';
     const lx=isFirst?x+2:isLast?x-2:x;
     xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
-    if(yr>0) grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`;
   }
   let zeroLine='';
   if(minV<0&&maxV>0){const y0=ys(0).toFixed(1);zeroLine=`<line x1="${PL}" y1="${y0}" x2="${W-PR}" y2="${y0}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/><text x="${PL-6}" y="${y0}" text-anchor="end" dominant-baseline="middle" fill="rgba(255,255,255,0.35)" font-size="10">0</text>`;}
@@ -1336,7 +1397,7 @@ async function regenerateSummary(d, waterfallData) {
 // ── FIRE Progress Bar ─────────────────────────────────────────────────────────
 function renderFireBar(d, container) {
   if (!d.fireNumber || d.fireNumber <= 0) {
-    container.innerHTML=`<h2>FIRE 達成度</h2><div class="fire-card" style="color:var(--muted);font-size:12px">FIRE目標が未設定です（data clean シート AA22 に目標純金融資産額を入力してください）</div>`;
+    container.innerHTML=`<div class="fire-card" style="color:var(--muted);font-size:12px">FIRE目標が未設定です（data clean シート AA22 に目標純金融資産額を入力してください）</div>`;
     return;
   }
 
@@ -1377,7 +1438,6 @@ function renderFireBar(d, container) {
   const tgtMonthly = tgtAnnual / 12;
 
   container.innerHTML = `
-    <h2 style="margin-top:0">FIRE 達成度</h2>
     <div class="fire-card">
       <div class="fire-header">
         <div>
@@ -1643,8 +1703,7 @@ function renderPassiveIncomeChart(history, d, container) {
   const overlay=`<rect id="piOverlay" x="${PL}" y="${PT}" width="${cW}" height="${cH}" fill="transparent" style="cursor:crosshair"/>`;
   const hair=`<line id="piHair" x1="0" y1="${PT}" x2="0" y2="${H-PB}" stroke="rgba(255,255,255,0.25)" stroke-width="1" visibility="hidden"/>`;
 
-  container.innerHTML = `<h2>年間パッシブ収入の推移</h2>
-  <div class="wfall-card" style="position:relative">
+  container.innerHTML = `<div class="wfall-card" style="position:relative">
     <svg id="piSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
       ${grid}${yLbl}${targetLine}${bars}${hair}${overlay}
     </svg>
@@ -1928,7 +1987,6 @@ function renderHistoryChart(history, container) {
     if(typeof info==='string'){container.innerHTML=info;return;}
     const {delta,pct,isGain,endNW,svgStr}=info;
     container.innerHTML=`
-      <h2>純資産推移</h2>
       <div class="hchart-card">
         <div class="hchart-header">
           <div>
@@ -2491,6 +2549,10 @@ function render(d) {
       <div class="header-meta">
         <span class="badge">USD/JPY ${d.exchangeRate.toFixed(2)}</span>
         <span class="badge">${dateStr}</span>
+        <span id="syncBadge" class="sync-badge" title="最終同期">
+          <span class="sync-dot"></span>
+          <span id="syncText">同期中…</span>
+        </span>
         <button class="btn" id="refreshBtn">↻ 更新</button>
       </div>
     </div>
@@ -2498,6 +2560,9 @@ function render(d) {
     <div id="projection" style="display:none"></div>`;
 
   const mainHtml = `
+
+    <!-- Stale snapshot warning (visible only when last history row is >2 days old) -->
+    <div id="staleBanner"></div>
 
     <!-- Row 1: summary metrics -->
     ${(()=>{
@@ -2515,7 +2580,7 @@ function render(d) {
         const pct   = oldNW ? (delta/oldNW*100) : 0;
         return `<div class="top-metric">
           <div class="top-metric-title">前年同期比</div>
-          <div class="top-metric-value ${colorClass(delta)}">${sign(delta)}${fmt(delta)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${pct>=0?'+':''}${pct.toFixed(1)}%)</span></div>
+          <div class="top-metric-value ${colorClass(delta)}">${sign(delta)}${fmt(delta)}<span class="top-metric-sub">(${pct>=0?'+':''}${pct.toFixed(1)}%)</span></div>
         </div>`;
       })();
 
@@ -2539,7 +2604,7 @@ function render(d) {
         </div>
         <div class="top-metric">
           <div class="top-metric-title">全体損益</div>
-          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span style="font-size:11px;font-weight:400;color:var(--muted)"> (${(()=>{const c=d.netFinancialAssets-d.totalGain;return c>0?(d.totalGain/c*100).toFixed(1):'0';})()}%)</span></div>
+          <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span class="top-metric-sub">(${(()=>{const c=d.netFinancialAssets-d.totalGain;return c>0?(d.totalGain/c*100).toFixed(1):'0';})()}%)</span></div>
         </div>
         <div class="top-metric">
           <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
@@ -2548,31 +2613,23 @@ function render(d) {
         ${_yoyHtml}
       </div>
 
-      <!-- FIRE progress -->
+      <div class="section-divider">FIRE 進捗</div>
       <div id="fireBarContainer"></div>
-
-      <!-- NW Milestone -->
       <div id="milestoneContainer"></div>
 
-      <!-- History chart -->
+      <div class="section-divider">純資産推移</div>
       <div id="historyChartContainer"></div>
 
-      <!-- Savings rate -->
+      <div class="section-divider">貯蓄 &amp; 積立</div>
       <div id="savingsRateContainer"></div>
-
-      <!-- Annual contribution summary -->
       <div id="annualContribContainer"></div>
 
-      <!-- MoM snapshot (above AI summary) -->
+      <div class="section-divider">月次レビュー</div>
       <div id="aiMomContainer"></div>
-
-      <!-- AI Summary -->
       <div id="aiSummaryContainer"></div>
-
-      <!-- Monthly waterfall -->
       <div id="waterfallContainer"></div>
 
-      <!-- Passive income history -->
+      <div class="section-divider">パッシブ収入</div>
       <div id="passiveIncomeContainer"></div>
 
       `;
@@ -2624,8 +2681,8 @@ function render(d) {
             </tfoot>
           </table>
         </div>
-        <div style="border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 20px;flex-shrink:0;gap:10px">
-          <svg viewBox="0 0 140 140" width="120" height="120" style="display:block">
+        <div class="tier-donut-wrap" style="border-left:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;gap:10px">
+          <svg viewBox="0 0 140 140" class="tier-donut" style="display:block">
             <circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${SW}"/>
             ${segs}
           </svg>
@@ -2820,6 +2877,8 @@ async function loadAndRender() {
   const dashEl = document.getElementById('dashboard');
   const btn = document.getElementById('refreshBtn');
   if (btn) btn.disabled = true;
+  _syncStatus = 'syncing';
+  updateSyncBadge();
   loadEl.style.display = 'block';
   loadEl.textContent = 'データ読み込み中...';
   dashEl.style.display = 'none';
@@ -2832,8 +2891,16 @@ async function loadAndRender() {
     loadEl.style.display = 'none';
     dashEl.style.display = 'block';
     render(data);
+    _syncStatus = 'ok';
+    _lastSyncedAt = new Date();
+    updateSyncBadge();
+    renderStaleBanner(_history);
   } catch (err) {
+    _syncStatus = 'fail';
+    updateSyncBadge();
     loadEl.innerHTML = `<div class="error-box">⚠️ データの読み込みに失敗しました: ${err.message}<br>スプレッドシートが公開設定になっているか確認してください。</div>`;
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
