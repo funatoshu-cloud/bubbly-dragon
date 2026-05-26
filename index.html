@@ -384,7 +384,7 @@ input[type=range] { accent-color:var(--blue); width:180px; cursor:pointer; }
 </head>
 <body>
 <div class="container">
-  <div id="loading">データ読み込み中...</div>
+  <div id="loading">Loading data…</div>
   <div id="dashboard" style="display:none"></div>
 </div>
 
@@ -399,6 +399,690 @@ const HCOL = { t1_index_value:1,t1_index_cost:2,t2_value:3,t2_cost:4,t3a_ideco_v
 const MONTHLY_COLS = ['t0_value','t1_gold','t1_hysa','t3a_insurance','t3b_value','passive_income'];
 let _history = [];
 
+// ── i18n ──────────────────────────────────────────────────────────────────────
+// English default; full Japanese translations. Toggle persists in localStorage.
+// Strings with placeholders use {var} syntax — pass an object to t() to fill them.
+const I18N = {
+  en: {
+    // Header
+    'header.refresh': '↻ Refresh',
+    'header.lang.toggle': '日本語',
+    // Tabs
+    'tab.dashboard': 'Dashboard',
+    'tab.projection': 'Projection',
+    // Sync badge
+    'sync.syncing': 'Syncing…',
+    'sync.fail': 'Sync failed · Retry',
+    'sync.empty': '—',
+    'sync.justNow': 'Just now',
+    'sync.minsAgo': '{n}m ago',
+    'sync.hoursAgo': '{n}h ago · Update recommended',
+    'sync.title': 'Last sync',
+    // Stale banner
+    'stale.banner': '⚠ Daily snapshot has not updated for {n} days (last: {date}) — check the Apps Script <code>snapshotDaily()</code> trigger',
+    // Top metrics
+    'metric.totalNW': 'Total Net Worth',
+    'metric.nfaMinusMortgage': 'NFA − Mortgage',
+    'metric.nfa': 'Net Financial Assets',
+    'metric.ytdGain': 'YTD P/L',
+    'metric.totalGain': 'Total Gain',
+    'metric.passiveIncome': 'Passive Income (Actual / Target)',
+    'metric.yoy': 'Year over Year',
+    // Section dividers
+    'section.fireProgress': 'FIRE Progress',
+    'section.nwHistory': 'Net Worth History',
+    'section.savings': 'Savings & Contributions',
+    'section.monthlyReview': 'Monthly Review',
+    'section.passiveIncome': 'Passive Income',
+    'section.assetTier': 'Asset Tiers',
+    'section.leverage': 'Leverage Health',
+    'section.scorecard': 'Scorecard',
+    'section.sectors': 'Sector Allocation',
+    'section.holdings': 'Holdings',
+    // FIRE bar
+    'fire.unset': 'FIRE target not set (enter target NFA in sheet AA22)',
+    'fire.remaining': 'Remaining {amt}',
+    'fire.achieved': '🎉 FIRE Reached!',
+    'fire.nfa': 'NFA',
+    'fire.target': 'FIRE Target',
+    'fire.swr.title': '4% Rule Safe Withdrawal',
+    'fire.swr.current': 'Current (NFA {nfa} × 4%)',
+    'fire.swr.atGoal': 'At goal ({target} × 4%)',
+    'fire.swr.perMonth': '/mo',
+    'fire.swr.perYear': '/yr',
+    // Milestone card
+    'ms.title': 'Next NFA Milestone',
+    'ms.remaining': 'Remaining {amt}',
+    'ms.months': '~{n} months',
+    'ms.years': '~{y}y',
+    'ms.yearsMonths': '~{y}y {m}mo',
+    // NW Pulse
+    'pulse.title': 'Net Worth Highlights',
+    'pulse.ath': 'All-Time High',
+    'pulse.last30d': 'Last 30 days',
+    'pulse.line': '{amt} Line',
+    'pulse.streak': 'crossed · {n} day streak',
+    'pulse.pace': 'Pace',
+    'pulse.perMonth': '/mo',
+    'pulse.today': 'today',
+    'pulse.daysAgo': '{n} days ago',
+    // Savings rate
+    'sr.title': 'Monthly Savings Rate',
+    'sr.unset': 'Monthly income not set. Enter take-home pay in <strong>AA24</strong> on the data clean sheet.',
+    'sr.investingRate': 'Investing rate',
+    'sr.goal': 'Goal',
+    'sr.target': '25%',
+    'sr.contribOf': '{contrib} contributed / {income} income',
+    'sr.month': '{m}/{y}',
+    'sr.mtd': '{m}/{y} MTD',
+    'sr.totalCommit': 'Total commitment (incl. spouse mortgage)',
+    'sr.spouseNote': '+¥90K/mo · through Mar 2027',
+    'sr.onPace': 'On pace',
+    'sr.behindPace': 'Below pace',
+    // Spend + Runway
+    'spend.title': 'Implied Monthly Spend',
+    'spend.subtitle': '({n}-month avg · derived from income)',
+    'spend.tipMethod': 'Income minus known savings outflows (investment contributions, mortgage payments, liquid asset growth, insurance accumulation). Multi-month average smooths bonus months and one-off spending.',
+    'spend.lifestyle': 'Implied lifestyle',
+    'spend.lifestylePct': '({pct}% of income)',
+    'spend.mortgage': 'Mortgage payment',
+    'spend.mortgageNote': 'P + I',
+    'spend.totalBurn': 'Total monthly burn',
+    'spend.perYear': '{amt}/yr',
+    'runway.title': 'Runway',
+    'runway.subtitle': '(if you stopped working today)',
+    'runway.duration': 'NFA lasts',
+    'runway.never': 'Lasts 50+ years',
+    'runway.years': '~{y}y',
+    'runway.yearsMonths': '~{y}y {m}mo',
+    'runway.atRate': '@ assumed return {pct}%',
+    'runway.swrCoverage': '4% rule coverage',
+    'runway.swrNote': '{swr}/yr vs needed {need}/yr',
+    // Annual contributions
+    'annual.title': 'Annual Contribution Summary',
+    'annual.bucket': 'Bucket',
+    'annual.ytd': 'YTD',
+    'annual.pace': 'Annual pace',
+    'annual.total': 'Total',
+    'annual.empty': 'Not enough history to compute annual pace.',
+    'annual.onPace': 'On pace',
+    'annual.behind': 'Behind pace',
+    'annual.yearProgress': '{year} ({months}mo elapsed · {pct}%)',
+    'annual.yearMtd': '{year} MTD',
+    'annual.tooltipPace': 'Annualized pace',
+    'annual.perYear': '/yr',
+    'annual.row.t1': 'T1 NISA',
+    'annual.row.t2': 'T2 Stocks',
+    'annual.row.t3a': 'T3a iDeCo',
+    'annual.row.total': 'Total',
+    // MoM card
+    'mom.title': 'Monthly NW Change',
+    'mom.mtd': '(MTD)',
+    'mom.totalChange': 'Total change',
+    'mom.biggestMover': 'Biggest mover',
+    'mom.badge.biggest': 'top',
+    'mom.contrib': 'Contributions',
+    'mom.returns': 'Investment returns',
+    'mom.mortgagePaydown': 'Mortgage paydown',
+    'mom.reChange': 'Real estate change',
+    'mom.t1Sub': '・ T1 index funds',
+    'mom.t2Sub': '・ T2 stocks',
+    'mom.t3aSub': '・ T3a iDeCo',
+    'mom.empty': 'Not enough monthly data yet.',
+    // AI summary
+    'ai.title': 'AI Summary',
+    'ai.placeholder': 'No summary yet — click ✦ Generate to create the first monthly snapshot',
+    'ai.generating': 'Triggering Gemini — reloading in 30 seconds…',
+    'ai.waiting': 'Waiting for Gemini… reloading in {s}s',
+    'ai.waitingNote': '(check Apps Script execution logs if it fails)',
+    'ai.reloading': 'Reloading data…',
+    'ai.generated': 'Generated {ts}',
+    'ai.generate': '✦ Generate',
+    'ai.clickToExpand': 'Click to expand',
+    'ai.btn.generating': '⏳ Generating…',
+    'ai.fb.markDone': 'Mark done',
+    'ai.fb.skip': 'Skip',
+    'ai.fb.addNote': 'Add note',
+    'ai.fb.notePlaceholder': 'Add context…',
+    'ai.setup.header': 'Setup required',
+    // Waterfall
+    'wf.title': 'Monthly NW Change Breakdown',
+    'wf.legend.contrib': 'Contributions',
+    'wf.legend.returns': 'Returns',
+    'wf.legend.mortgage': 'Mortgage paydown',
+    'wf.legend.re': 'Real estate Δ',
+    'wf.legend.t1': 'T1 NISA',
+    'wf.legend.t2': 'T2 Stocks',
+    'wf.legend.t3a': 'T3a iDeCo',
+    'wf.legend.retPos': 'Gains',
+    'wf.legend.retNeg': 'Losses',
+    'wf.velocityPace': 'Pace',
+    'wf.velocityAvg3': '3-month average',
+    'wf.velocityAvgN': '{n}-month average',
+    'wf.mtdInline': '(MTD)',
+    'wf.tipTotal': 'Total',
+    'wf.tipPrev': 'Previous month NW',
+    'wf.tipNow': 'Current NW',
+    // Passive income chart
+    'pi.title': 'Annual Passive Income Trend',
+    'pi.empty': 'No passive income history yet',
+    'pi.target': 'Target',
+    'pi.ofTarget': '({pct}% of target)',
+    // History chart
+    'hc.title': 'Net Worth History',
+    'hc.empty': 'No history data',
+    'hc.nw': 'Net Worth',
+    'hc.cost': 'Cost basis',
+    'hc.period.7d': '7D',
+    'hc.period.4w': '4W',
+    'hc.period.ytd': 'YTD',
+    'hc.period.1y': '1Y',
+    'hc.period.all': 'All',
+    // Mortgage simulator
+    'msim.title': 'Mortgage Simulator',
+    'msim.balance': 'Balance',
+    'msim.monthlyPmt': 'Monthly payment',
+    'msim.remaining': 'Time remaining',
+    'msim.remainingInterest': 'Interest remaining',
+    'msim.extra': 'Extra monthly payment',
+    'msim.timeSaved': 'Time saved',
+    'msim.interestSaved': 'Interest saved',
+    'msim.payoffDate': 'Payoff date',
+    'msim.footer': 'Rate {rate}% · Level payment · Based on current balance',
+    'msim.basePace': 'Base pace',
+    'msim.paid': 'Paid off',
+    'msim.years': '{y}y',
+    'msim.yearsMonths': '{y}y {m}mo',
+    // Projection tab
+    'proj.warn.tooFew': 'Not enough data ({n} day{s} recorded) — enter rates manually to preview a projection, or wait until 30 days have been captured.',
+    'proj.warn.limited': 'Limited data ({n} days) — estimates may not reflect full annual contribution patterns.',
+    'proj.horizon': 'Time horizon — {n} year{s}',
+    'proj.horizonPrefix': 'Time horizon — ',
+    'proj.horizon.unit': '{n} year{s}',
+    'proj.contributions': 'Contributions',
+    'proj.contrib.auto': 'Historical pace',
+    'proj.contrib.manual': 'Manual input',
+    'proj.stopFrom': 'Stop contributing from',
+    'proj.nwTarget': 'NW target (¥)',
+    'proj.scope': 'Scope',
+    'proj.scope.total': 'Total NW',
+    'proj.scope.nfa': 'NFA (exclude T4)',
+    'proj.scope.excludeRE': 'Exclude real estate (mortgage as liability)',
+    'proj.manualTitle': 'Manual rates',
+    'proj.manual.amount': '¥/month',
+    'proj.manual.return': 'Return %',
+    'proj.ratesTitle': 'Rate assumptions',
+    'proj.rate.bucket': 'Bucket',
+    'proj.rate.annual': 'Annual return',
+    'proj.rate.sigma': '±σ / yr',
+    'proj.rate.contrib': 'Monthly contrib',
+    'proj.rate.fromJun': 'from Jun 2026',
+    'proj.rate.unreliable': '⚠ Rates shown are estimated from {n} day{s} of data and are not reliable. Use manual mode for meaningful projections.',
+    'proj.legend.optimistic': 'Optimistic',
+    'proj.legend.base': 'Base',
+    'proj.legend.pessimistic': 'Pessimistic',
+    'proj.legend.worstCase': 'Worst case',
+    'proj.legend.worstCaseTip': '-30% shock to T1 index, T2 stocks, T3a iDeCo in year 1, then compound at pessimistic rate (base − σ) — worst-case scenario',
+    'proj.legend.coastFire': 'Coast FIRE',
+    'proj.annotation.netZero.reached': 'Mortgage paid off + NFA net zero in {y}y {m}m',
+    'proj.annotation.netZero.notReached': 'Net zero not reached within {y} years',
+    'proj.annotation.targetHit': '📈 Base reaches target in {y}y {m}m',
+    'proj.annotation.targetMissed': 'Base scenario does not reach target within {y} years',
+    'proj.annotation.coast': '🏖 Coast FIRE in {y}y {m}m — contributions optional from then',
+    'proj.longWarn': '⚠ Long projection with limited history',
+    'proj.table.bucket': 'Bucket',
+    'proj.table.current': 'Current',
+    'proj.table.projected': 'Projected',
+    'proj.table.capAdded': 'Capital added',
+    'proj.table.returns': 'Returns',
+    'proj.table.rate': 'Rate',
+    'proj.table.linear': 'linear paydown',
+    'proj.table.total': 'Total ({scope})',
+    'proj.scope.totalLong': 'Total Net Worth',
+    'proj.scope.nfaLong': 'Net Financial Assets',
+    'proj.scope.excludeRELong': 'NFA − Mortgage',
+    'proj.t4LinearLabel': 'T4 Mortgage (liability)',
+    'proj.noData': 'No data available yet.',
+    'proj.rateClampedTip': 'Rate clamped to ±25%/yr to keep projection realistic',
+    'proj.histDays': '{n}d',
+    'proj.histDaysInsufficient': '⚠ {n}d — insufficient',
+    'proj.histDaysWarn': '⚠ {n}d',
+    'proj.now': 'Now',
+    'proj.yr': '{n}yr',
+    'proj.tooltip.worst': 'worst',
+    // Bucket labels (used in projection rates table + summary)
+    'bucket.t1_index': 'T1 Index funds',
+    'bucket.t2': 'T2 Stocks',
+    'bucket.t3a_ideco': 'T3(a) iDeCo',
+    'bucket.t4': 'T4 Real estate equity',
+    'bucket.t0': 'T0 Cash',
+    'bucket.t1_hysa': 'T1 HYSA',
+    'bucket.t1_gold': 'T1 Gold',
+    'bucket.t3a_insurance': 'T3(a) Insurance',
+    'bucket.t3b': 'T3(b) 529',
+    // Tier table
+    'tier.tier': 'Tier',
+    'tier.category': 'Category',
+    'tier.types': 'Asset type',
+    'tier.amount': 'Amount',
+    'tier.total': 'Total',
+    'tier.label.t0': 'Liquidity Buffer',
+    'tier.label.t1': 'Core Portfolio',
+    'tier.label.t2': 'Satellite',
+    'tier.label.t3a': 'Restricted (Retirement)',
+    'tier.label.t3b': 'Conditional Assets',
+    'tier.label.t4': 'Real Estate',
+    // Leverage
+    'lev.ltv': 'Loan-to-Value (LTV)',
+    'lev.nwCov': 'NW coverage of mortgage',
+    'lev.dscr': 'DSCR (income / payment)',
+    'lev.di': 'Debt / Income',
+    'lev.targetUnder': 'Target <{n}%',
+    'lev.targetOver': 'Target >{n}%',
+    'lev.targetOverX': 'Target >{n}x',
+    'lev.target': 'Target',
+    'lev.card.ltv': 'LTV (your equity)',
+    'lev.card.nwCov': 'NW coverage',
+    'lev.card.di': 'Total debt / annual income',
+    'lev.card.dscr': 'Debt-service ratio (gross)',
+    // Scorecard
+    'sc.title': 'Scorecard',
+    'sc.metric': 'Metric',
+    'sc.actual': 'Actual',
+    'sc.target': 'Target',
+    'sc.status': 'Status',
+    'sc.ok': '✓ OK',
+    'sc.warn': '⚠',
+    'sc.bad': '✗',
+    'sc.row.t1Pct': 'T1 portfolio share',
+    'sc.row.indexPct': 'Index fund share',
+    'sc.row.singlePct': 'Single stock concentration',
+    'sc.row.cashDrag': 'Cash drag',
+    'sc.row.bufferAmount': 'Emergency buffer',
+    'sc.row.ltv': 'LTV',
+    'sc.row.passiveYield': 'Passive yield',
+    'sc.col.item': 'Metric',
+    'sc.col.target': 'Target',
+    'sc.col.actual': 'Actual',
+    'sc.section.allocation': '── Investment Allocation (T1 + T2) ──',
+    'sc.section.guardrails': '── Dividends & Guardrails ──',
+    'sc.section.nisa': '── NISA ──',
+    'sc.row.coreRatio': 'Core ratio (T1%)',
+    'sc.row.diversification': 'Diversification (fund %)',
+    'sc.row.concentration': 'Concentration (single stocks %)',
+    'sc.row.positionCap': 'Single position cap',
+    'sc.row.positionCapNoRsu': 'Single position cap (ex-RSU)',
+    'sc.row.emergencyFund': 'Emergency fund (T0)',
+    'sc.row.cashRatio': 'Cash ratio (HYSA / T1)',
+    'sc.row.divYield': 'Dividend yield',
+    'sc.row.nisa2026': '2026 NISA quota',
+    'sc.row.nisaLife': 'Lifetime NISA quota',
+    // Holdings table
+    'hold.title': 'Holdings',
+    'hold.symbol': 'Symbol',
+    'hold.name': 'Name',
+    'hold.tier': 'Tier',
+    'hold.value': 'Value',
+    'hold.cost': 'Cost',
+    'hold.gain': 'Gain',
+    'hold.gainPct': '%',
+    'hold.share': 'Share',
+    'hold.empty': 'No holdings data',
+    'hold.pageInfo': '{start}–{end} of {total}',
+    'hold.prev': 'Previous page',
+    'hold.next': 'Next page',
+    'hold.totalSymbols': 'Total ({n} symbols)',
+    // Sector table
+    'sec.sector': 'Sector',
+    'sec.amount': 'Amount',
+    'sec.pct': '%',
+    // Misc
+    'common.usdJpy': 'USD/JPY',
+    'common.error.load': '⚠️ Failed to load data: {msg}<br>Check that the spreadsheet is set to public.',
+    'common.noData': 'No data available yet.',
+    'common.loading': 'Loading data…',
+  },
+  ja: {
+    'header.refresh': '↻ 更新',
+    'header.lang.toggle': 'EN',
+    'tab.dashboard': 'ダッシュボード',
+    'tab.projection': 'プロジェクション',
+    'sync.syncing': '同期中…',
+    'sync.fail': '同期失敗 · 再試行',
+    'sync.empty': '—',
+    'sync.justNow': 'たった今',
+    'sync.minsAgo': '{n}分前',
+    'sync.hoursAgo': '{n}時間前 · 更新推奨',
+    'sync.title': '最終同期',
+    'stale.banner': '⚠ 日次スナップショットが {n} 日間更新されていません (最終: {date}) — Apps Script の <code>snapshotDaily()</code> トリガーを確認してください',
+    'metric.totalNW': '純資産合計',
+    'metric.nfaMinusMortgage': '純金融資産 - 住宅ローン',
+    'metric.nfa': '純金融資産',
+    'metric.ytdGain': 'YTD損益',
+    'metric.totalGain': '全体損益',
+    'metric.passiveIncome': '年間パッシブ収入（実績/目標）',
+    'metric.yoy': '前年同期比',
+    'section.fireProgress': 'FIRE 進捗',
+    'section.nwHistory': '純資産推移',
+    'section.savings': '貯蓄 & 積立',
+    'section.monthlyReview': '月次レビュー',
+    'section.passiveIncome': 'パッシブ収入',
+    'section.assetTier': '資産 Tier',
+    'section.leverage': 'レバレッジ健全性',
+    'section.scorecard': 'スコアカード',
+    'section.sectors': 'セクター配分',
+    'section.holdings': '保有銘柄一覧',
+    'fire.unset': 'FIRE目標が未設定です（data clean シート AA22 に目標純金融資産額を入力してください）',
+    'fire.remaining': '残り {amt}',
+    'fire.achieved': '🎉 FIRE 達成！',
+    'fire.nfa': '純金融資産',
+    'fire.target': 'FIRE 目標',
+    'fire.swr.title': '4% ルール 安全引き出し率',
+    'fire.swr.current': '現在 (純金融資産 {nfa} × 4%)',
+    'fire.swr.atGoal': '目標達成時 ({target} × 4%)',
+    'fire.swr.perMonth': '/月',
+    'fire.swr.perYear': '/年',
+    'ms.title': '純金融資産 次のマイルストーン',
+    'ms.remaining': '残り {amt}',
+    'ms.months': '約{n}ヶ月',
+    'ms.years': '約{y}年',
+    'ms.yearsMonths': '約{y}年{m}ヶ月',
+    'pulse.title': '純資産ハイライト',
+    'pulse.ath': '史上最高値',
+    'pulse.last30d': '直近30日',
+    'pulse.line': '{amt} ライン',
+    'pulse.streak': '突破から {n}日連続',
+    'pulse.pace': 'ペース',
+    'pulse.perMonth': '/月',
+    'pulse.today': '今日',
+    'pulse.daysAgo': '{n}日前',
+    'sr.title': '月次貯蓄率',
+    'sr.unset': '月収が未設定です。Google スプレッドシートの <strong style="color:var(--text)">data clean シート AA24</strong> に月収（手取り）を入力してください。',
+    'sr.investingRate': '投資率',
+    'sr.goal': '目標',
+    'sr.target': '25%',
+    'sr.contribOf': '積立 {contrib} / 月収 {income}',
+    'sr.month': '{m}月{y}',
+    'sr.mtd': '{m}月{y} MTD',
+    'sr.totalCommit': '妻ローン負担込み',
+    'sr.spouseNote': '+¥90K/月 · 2027年3月まで',
+    'sr.onPace': '達成ペース',
+    'sr.behindPace': 'ペース未満',
+    'spend.title': '推定月次支出',
+    'spend.subtitle': '({n}ヶ月平均 · 月収から逆算)',
+    'spend.tipMethod': '月収から既知の貯蓄系流出 (投資積立, ローン返済, 流動性資産増分, 保険積立) を差し引いた残額。ボーナス月や臨時支出で変動するため複数月の平均で表示。',
+    'spend.lifestyle': '推定生活費',
+    'spend.lifestylePct': '({pct}% of 月収)',
+    'spend.mortgage': '住宅ローン',
+    'spend.mortgageNote': '元利金等',
+    'spend.totalBurn': '合計月次バーン',
+    'spend.perYear': '{amt}/年',
+    'runway.title': 'ランウェイ',
+    'runway.subtitle': '(今日仕事を辞めたら)',
+    'runway.duration': '純金融資産持続期間',
+    'runway.never': '50年以上持続',
+    'runway.years': '約 {y}年',
+    'runway.yearsMonths': '約 {y}年{m}ヶ月',
+    'runway.atRate': '@ 想定利回り {pct}%',
+    'runway.swrCoverage': '4%ルール カバー率',
+    'runway.swrNote': '{swr}/年 vs 必要 {need}/年',
+    'annual.title': '年次積立サマリー',
+    'annual.bucket': 'バケット',
+    'annual.ytd': 'YTD',
+    'annual.pace': '年間ペース',
+    'annual.total': '合計',
+    'annual.empty': '年間ペースを計算するための履歴が不足しています。',
+    'annual.onPace': '達成ペース',
+    'annual.behind': 'ペース未満',
+    'annual.yearProgress': '{year}年（{months}ヶ月経過・{pct}%）',
+    'annual.yearMtd': '{year}年 MTD',
+    'annual.tooltipPace': '年換算ペース',
+    'annual.perYear': '/年',
+    'annual.row.t1': 'T1 NISA',
+    'annual.row.t2': 'T2 株式',
+    'annual.row.t3a': 'T3a iDeCo',
+    'annual.row.total': '合計',
+    'mom.title': '月次 NW 変動内訳',
+    'mom.mtd': '(MTD)',
+    'mom.totalChange': '総変動',
+    'mom.biggestMover': '最大変動',
+    'mom.badge.biggest': '最大',
+    'mom.contrib': '資金追加',
+    'mom.returns': '運用損益',
+    'mom.mortgagePaydown': 'ローン返済',
+    'mom.reChange': '不動産変動',
+    'mom.t1Sub': '・ T1 インデックス',
+    'mom.t2Sub': '・ T2 株式',
+    'mom.t3aSub': '・ T3(a) iDeCo',
+    'mom.empty': '月次データが不足しています。',
+    'ai.title': 'AI サマリー',
+    'ai.placeholder': 'まだサマリーはありません — ✦ Generate で最初の月次スナップショットを作成',
+    'ai.generating': 'Gemini をトリガー中 — 30秒後に再読み込み…',
+    'ai.waiting': 'Gemini 応答待ち… {s}秒後に再読み込み',
+    'ai.waitingNote': '(失敗時は Apps Script の実行ログを確認)',
+    'ai.reloading': 'データを再読み込み中…',
+    'ai.generated': '生成: {ts}',
+    'ai.generate': '✦ 生成',
+    'ai.clickToExpand': 'クリックで展開',
+    'ai.btn.generating': '⏳ 生成中…',
+    'ai.fb.markDone': '完了マーク',
+    'ai.fb.skip': 'スキップ',
+    'ai.fb.addNote': 'メモ追加',
+    'ai.fb.notePlaceholder': 'メモを追加…',
+    'ai.setup.header': '初期設定',
+    'wf.title': '月次 NW 変動内訳',
+    'wf.legend.contrib': '資金追加',
+    'wf.legend.returns': '運用損益',
+    'wf.legend.mortgage': 'ローン返済',
+    'wf.legend.re': '不動産変動',
+    'wf.legend.t1': 'T1 NISA',
+    'wf.legend.t2': 'T2 株式',
+    'wf.legend.t3a': 'T3a iDeCo',
+    'wf.legend.retPos': '運用益',
+    'wf.legend.retNeg': '運用損',
+    'wf.velocityPace': '増加ペース',
+    'wf.velocityAvg3': '過去3ヶ月平均',
+    'wf.velocityAvgN': '過去{n}ヶ月平均',
+    'wf.mtdInline': '(MTD)',
+    'wf.tipTotal': '総変動',
+    'wf.tipPrev': '前月の純資産',
+    'wf.tipNow': '現在の純資産',
+    'pi.title': '年間パッシブ収入の推移',
+    'pi.empty': 'パッシブ収入の履歴データがまだありません',
+    'pi.target': '目標',
+    'pi.ofTarget': '(目標の {pct}%)',
+    'hc.title': '純資産推移',
+    'hc.empty': '履歴データがありません',
+    'hc.nw': '純資産',
+    'hc.cost': '簿価合計',
+    'hc.period.7d': '7日',
+    'hc.period.4w': '4週',
+    'hc.period.ytd': 'YTD',
+    'hc.period.1y': '1年',
+    'hc.period.all': '全期間',
+    'msim.title': '住宅ローンシミュレーター',
+    'msim.balance': '残高',
+    'msim.monthlyPmt': '月額返済',
+    'msim.remaining': '残り期間',
+    'msim.remainingInterest': '残り利息',
+    'msim.extra': '毎月の追加返済',
+    'msim.timeSaved': '期間短縮',
+    'msim.interestSaved': '利息節約',
+    'msim.payoffDate': '完済予定',
+    'msim.footer': '金利 {rate}% ／ 元利金等払い ／ 現在残高ベースで計算',
+    'msim.basePace': '元のペース',
+    'msim.paid': '完済',
+    'msim.years': '{y}年',
+    'msim.yearsMonths': '{y}年{m}ヶ月',
+    'proj.warn.tooFew': 'データ不足 ({n}日記録) — 手動でレートを入力するか、30日経過まで待ってください。',
+    'proj.warn.limited': 'データが限られています ({n}日) — 年間積立パターンを十分に反映していない可能性があります。',
+    'proj.horizon': '期間 — {n}年',
+    'proj.horizonPrefix': '期間 — ',
+    'proj.horizon.unit': '{n}年',
+    'proj.contributions': '積立',
+    'proj.contrib.auto': '過去ペース',
+    'proj.contrib.manual': '手動入力',
+    'proj.stopFrom': '積立停止時期',
+    'proj.nwTarget': '純資産目標 (¥)',
+    'proj.scope': 'スコープ',
+    'proj.scope.total': '純資産合計 (Total NW)',
+    'proj.scope.nfa': '純金融資産 (NFA, T4 除外)',
+    'proj.scope.excludeRE': '不動産除外 (mortgage as liability)',
+    'proj.manualTitle': '手動レート',
+    'proj.manual.amount': '¥/月',
+    'proj.manual.return': '利回り %',
+    'proj.ratesTitle': 'レート前提',
+    'proj.rate.bucket': 'バケット',
+    'proj.rate.annual': '年率',
+    'proj.rate.sigma': '±σ / 年',
+    'proj.rate.contrib': '月次積立',
+    'proj.rate.fromJun': '2026年6月から',
+    'proj.rate.unreliable': '⚠ レートは {n} 日のデータから推定されており信頼性が低いです。意味のある予測には手動モードを使用してください。',
+    'proj.legend.optimistic': '楽観',
+    'proj.legend.base': 'ベース',
+    'proj.legend.pessimistic': '悲観',
+    'proj.legend.worstCase': 'ワーストケース',
+    'proj.legend.worstCaseTip': '初年に T1 インデックス / T2 株式 / T3a iDeCo に -30% ショック、その後は悲観レート (base − σ) で複利成長 — 最悪シナリオ',
+    'proj.legend.coastFire': 'Coast FIRE',
+    'proj.annotation.netZero.reached': '住宅ローン完済 + 純金融資産 net zero in {y}年{m}ヶ月',
+    'proj.annotation.netZero.notReached': '{y}年以内に net zero に到達せず',
+    'proj.annotation.targetHit': '📈 ベースが目標に到達: {y}年{m}ヶ月',
+    'proj.annotation.targetMissed': 'ベースシナリオは {y}年以内に目標に到達しません',
+    'proj.annotation.coast': '🏖 Coast FIRE: {y}年{m}ヶ月 — 以降は積立任意',
+    'proj.longWarn': '⚠ 履歴に対して長期の予測 — 参考程度に',
+    'proj.table.bucket': 'バケット',
+    'proj.table.current': '現在価値',
+    'proj.table.projected': '予測値',
+    'proj.table.capAdded': '資金追加',
+    'proj.table.returns': '運用益',
+    'proj.table.rate': '年率',
+    'proj.table.linear': '線形返済',
+    'proj.table.total': '合計 ({scope})',
+    'proj.scope.totalLong': '純資産合計 (NW)',
+    'proj.scope.nfaLong': '純金融資産 (NFA)',
+    'proj.scope.excludeRELong': 'NFA − 住宅ローン',
+    'proj.t4LinearLabel': 'T4 住宅ローン (負債)',
+    'proj.noData': 'データがまだありません。',
+    'proj.rateClampedTip': '±25%/年で制限済み (現実的な範囲を維持)',
+    'proj.histDays': '{n}日',
+    'proj.histDaysInsufficient': '⚠ {n}日 — 不十分',
+    'proj.histDaysWarn': '⚠ {n}日',
+    'proj.now': '現在',
+    'proj.yr': '{n}年',
+    'proj.tooltip.worst': '最悪',
+    'bucket.t1_index': 'T1 インデックス',
+    'bucket.t2': 'T2 株式',
+    'bucket.t3a_ideco': 'T3(a) iDeCo',
+    'bucket.t4': 'T4 不動産エクイティ',
+    'bucket.t0': 'T0 現金',
+    'bucket.t1_hysa': 'T1 HYSA',
+    'bucket.t1_gold': 'T1 ゴールド',
+    'bucket.t3a_insurance': 'T3(a) 保険',
+    'bucket.t3b': 'T3(b) 529',
+    'tier.tier': 'Tier',
+    'tier.category': 'カテゴリ',
+    'tier.types': '資産種別',
+    'tier.amount': '金額',
+    'tier.total': '合計',
+    'tier.label.t0': '流動性バッファ',
+    'tier.label.t1': 'コアポートフォリオ',
+    'tier.label.t2': 'サテライト',
+    'tier.label.t3a': '制限付き (退職)',
+    'tier.label.t3b': '条件付き資産',
+    'tier.label.t4': '不動産',
+    'lev.ltv': 'LTV (借入比率)',
+    'lev.nwCov': '純資産でローン何倍カバー',
+    'lev.dscr': 'DSCR (収入 / 返済)',
+    'lev.di': '借入 / 年収',
+    'lev.targetUnder': '目標 <{n}%',
+    'lev.targetOver': '目標 >{n}%',
+    'lev.targetOverX': '目標 >{n}x',
+    'lev.target': '目標',
+    'lev.card.ltv': 'LTV（自己持分）',
+    'lev.card.nwCov': '純資産カバー率',
+    'lev.card.di': '総債務÷年収',
+    'lev.card.dscr': '返済比率（額面ベース）',
+    'sc.title': 'スコアカード',
+    'sc.metric': '指標',
+    'sc.actual': '実績',
+    'sc.target': '目標',
+    'sc.status': '判定',
+    'sc.ok': '✓ OK',
+    'sc.warn': '⚠',
+    'sc.bad': '✗',
+    'sc.row.t1Pct': 'T1 構成比',
+    'sc.row.indexPct': 'インデックス比率',
+    'sc.row.singlePct': '個別株集中度',
+    'sc.row.cashDrag': '現金比率',
+    'sc.row.bufferAmount': '生活防衛資金',
+    'sc.row.ltv': 'LTV',
+    'sc.row.passiveYield': 'パッシブ利回り',
+    'sc.col.item': '項目',
+    'sc.col.target': '目標',
+    'sc.col.actual': '実績',
+    'sc.section.allocation': '──  運用資産（T1 + T2）割合  ──',
+    'sc.section.guardrails': '──  配当周り・ガードレール  ──',
+    'sc.section.nisa': '──  NISA関係  ──',
+    'sc.row.coreRatio': 'コア比率 (T1%)',
+    'sc.row.diversification': '分散度 (投信%)',
+    'sc.row.concentration': '集中度 (個別株%)',
+    'sc.row.positionCap': '銘柄上限',
+    'sc.row.positionCapNoRsu': '銘柄上限（RSU除く）',
+    'sc.row.emergencyFund': '生活防衛資金（T0）',
+    'sc.row.cashRatio': '現金比率（HYSA÷T1）',
+    'sc.row.divYield': '配当利回り',
+    'sc.row.nisa2026': '2026年投資枠',
+    'sc.row.nisaLife': '生涯投資枠',
+    'hold.title': '保有銘柄一覧',
+    'hold.symbol': 'シンボル',
+    'hold.name': '銘柄名',
+    'hold.tier': 'Tier',
+    'hold.value': '評価額',
+    'hold.cost': '簿価',
+    'hold.gain': '損益',
+    'hold.gainPct': '%',
+    'hold.share': '構成比',
+    'hold.empty': '銘柄データがありません',
+    'hold.pageInfo': '{start}–{end} / {total}銘柄',
+    'hold.prev': '前のページ',
+    'hold.next': '次のページ',
+    'hold.totalSymbols': '合計 ({n}銘柄)',
+    'sec.sector': 'セクター',
+    'sec.amount': '金額',
+    'sec.pct': '構成比',
+    'common.usdJpy': 'USD/JPY',
+    'common.error.load': '⚠️ データの読み込みに失敗しました: {msg}<br>スプレッドシートが公開設定になっているか確認してください。',
+    'common.noData': 'データがまだありません。',
+    'common.loading': 'データ読み込み中…',
+  },
+};
+
+let _lang = (() => {
+  try { return localStorage.getItem('wt_lang') || 'en'; } catch (_) { return 'en'; }
+})();
+
+function t(key, vars) {
+  let s = (I18N[_lang] && I18N[_lang][key]) || I18N.en[key] || key;
+  if (vars) {
+    for (const k of Object.keys(vars)) {
+      s = s.split('{' + k + '}').join(vars[k]);
+    }
+  }
+  return s;
+}
+
+function setLang(lang) {
+  if (lang !== 'en' && lang !== 'ja') return;
+  _lang = lang;
+  try { localStorage.setItem('wt_lang', lang); } catch (_) {}
+  if (typeof loadAndRender === 'function') loadAndRender();
+}
+
+// Locale-aware date helpers
+function fmtDateLocal(d, opts) {
+  return d.toLocaleDateString(_lang === 'ja' ? 'ja-JP' : 'en-US', opts);
+}
+
 // Sync state — drives the sync badge in the header
 let _lastSyncedAt = null;
 let _syncStatus = 'idle';  // 'syncing' | 'ok' | 'fail' | 'idle'
@@ -407,14 +1091,14 @@ function updateSyncBadge() {
   const el = document.getElementById('syncText');
   const dot = document.querySelector('#syncBadge .sync-dot');
   if (!el || !dot) return;
-  if (_syncStatus === 'syncing') { el.textContent='同期中…'; dot.className='sync-dot syncing'; return; }
-  if (_syncStatus === 'fail')    { el.textContent='同期失敗 · 再試行'; dot.className='sync-dot fail'; return; }
-  if (!_lastSyncedAt)            { el.textContent='—'; dot.className='sync-dot'; return; }
+  if (_syncStatus === 'syncing') { el.textContent=t('sync.syncing'); dot.className='sync-dot syncing'; return; }
+  if (_syncStatus === 'fail')    { el.textContent=t('sync.fail');     dot.className='sync-dot fail'; return; }
+  if (!_lastSyncedAt)            { el.textContent=t('sync.empty');    dot.className='sync-dot'; return; }
   const mins = Math.floor((Date.now() - _lastSyncedAt) / 60000);
   let txt, cls;
-  if (mins < 1)         { txt='たった今';        cls='sync-dot ok'; }
-  else if (mins < 60)   { txt=`${mins}分前`;     cls= mins<30 ? 'sync-dot ok' : 'sync-dot warn'; }
-  else                  { txt=`${Math.floor(mins/60)}時間前 · 更新推奨`; cls='sync-dot warn'; }
+  if (mins < 1)         { txt=t('sync.justNow');                       cls='sync-dot ok'; }
+  else if (mins < 60)   { txt=t('sync.minsAgo', {n: mins});             cls= mins<30 ? 'sync-dot ok' : 'sync-dot warn'; }
+  else                  { txt=t('sync.hoursAgo', {n: Math.floor(mins/60)}); cls='sync-dot warn'; }
   el.textContent=txt; dot.className=cls;
 }
 setInterval(updateSyncBadge, 60000);
@@ -428,10 +1112,8 @@ function renderStaleBanner(history) {
   const lastDate = history[history.length-1].date;
   const daysOld = Math.floor((Date.now() - lastDate) / (1000*60*60*24));
   if (daysOld < 2) { container.innerHTML=''; return; }
-  const lbl = lastDate.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
-  container.innerHTML = `<div class="stale-banner">
-    ⚠ 日次スナップショットが ${daysOld} 日間更新されていません (最終: ${lbl}) — Apps Script の <code>snapshotDaily()</code> トリガーを確認してください
-  </div>`;
+  const lbl = fmtDateLocal(lastDate, {month:'short',day:'numeric'});
+  container.innerHTML = `<div class="stale-banner">${t('stale.banner', {n: daysOld, date: lbl})}</div>`;
 }
 
 function parseHistory(rows) {
@@ -705,7 +1387,7 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
     if(!isFirst && !isLast && yr % skipEvery !== 0) continue;
     const anchor=isFirst?'start':isLast?'end':'middle';
     const lx=isFirst?x+2:isLast?x-2:x;
-    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr===0?'Now':yr+'yr'}</text>`;
+    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr===0?t('proj.now'):t('proj.yr',{n:yr})}</text>`;
   }
   let zeroLine='';
   if(minV<0&&maxV>0){const y0=ys(0).toFixed(1);zeroLine=`<line x1="${PL}" y1="${y0}" x2="${W-PR}" y2="${y0}" stroke="rgba(255,255,255,0.25)" stroke-width="1"/><text x="${PL-6}" y="${y0}" text-anchor="end" dominant-baseline="middle" fill="rgba(255,255,255,0.35)" font-size="10">0</text>`;}
@@ -713,7 +1395,7 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
   let targetLine='';
   if(targetNW&&targetNW>minV&&targetNW<maxV){
     const yT=ys(targetNW).toFixed(1);
-    targetLine=`<line x1="${PL}" y1="${yT}" x2="${W-PR}" y2="${yT}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,4"/><text x="${W-PR+4}" y="${yT}" dominant-baseline="middle" fill="#58a6ff" font-size="9">Target</text>`;
+    targetLine=`<line x1="${PL}" y1="${yT}" x2="${W-PR}" y2="${yT}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="4,4"/><text x="${W-PR+4}" y="${yT}" dominant-baseline="middle" fill="#58a6ff" font-size="9">${t('pi.target')}</text>`;
   }
   // Coast FIRE curve
   let coastLine='';
@@ -721,7 +1403,7 @@ function buildChart(projData, currentNW, targetNW, coastNW) {
     const coastPts=coastNW.map((v,m)=>v>=minV&&v<=maxV*1.1?`${xs(m).toFixed(1)},${ys(Math.min(v,maxV)).toFixed(1)}`:null).filter(Boolean).join(' ');
     if(coastPts) coastLine=`<polyline points="${coastPts}" fill="none" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="6,3"/>`;
     const lastVisible=coastNW.reduce((acc,v,m)=>v>=minV&&v<=maxV*1.1?m:acc,-1);
-    if(lastVisible>0){const lx=xs(lastVisible),isRight=lx>W*0.75;coastLine+=`<text x="${(isRight?lx-2:lx).toFixed(1)}" y="${(ys(coastNW[lastVisible])-6).toFixed(1)}" text-anchor="${isRight?'end':'middle'}" fill="#f0883e" font-size="9">Coast FIRE</text>`;}
+    if(lastVisible>0){const lx=xs(lastVisible),isRight=lx>W*0.75;coastLine+=`<text x="${(isRight?lx-2:lx).toFixed(1)}" y="${(ys(coastNW[lastVisible])-6).toFixed(1)}" text-anchor="${isRight?'end':'middle'}" fill="#f0883e" font-size="9">${t('proj.legend.coastFire')}</text>`;}
   }
 
   const hairline=`<line id="chartHairline" x1="${PL}" y1="${PT}" x2="${PL}" y2="${H-PB}" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,2" pointer-events="none" visibility="hidden"/>`;
@@ -775,11 +1457,9 @@ function setupChartInteraction(projData) {
 
   const lookup=new Map(projData.map(p=>[p.month,p]));
   const now=new Date();
-  const MONTHS_JP=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
-
   function monthLabel(m){
     const d=new Date(now.getFullYear(),now.getMonth()+m,1);
-    return `${d.getFullYear()}年 ${MONTHS_JP[d.getMonth()]}`;
+    return fmtDateLocal(d, {year:'numeric', month:'short'});
   }
 
   function showAt(clientX, clientY, containerRect) {
@@ -807,7 +1487,7 @@ function setupChartInteraction(projData) {
       `<div style="color:rgba(63,185,80,0.9);margin-bottom:2px">▲ ${fmt(pt.optimistic)}</div>`+
       `<div style="color:#58a6ff;margin-bottom:2px">— ${fmt(pt.base)}</div>`+
       `<div style="color:rgba(248,81,73,0.85);margin-bottom:${hasStress?'2px':'0'}">▼ ${fmt(pt.pessimistic)}</div>`+
-      (hasStress?`<div style="color:rgba(139,148,158,0.9)">⚠ ${fmt(pt.stress)} <span style="color:#6b7888;font-size:10px">worst</span></div>`:'');
+      (hasStress?`<div style="color:rgba(139,148,158,0.9)">⚠ ${fmt(pt.stress)} <span style="color:#6b7888;font-size:10px">${t('proj.tooltip.worst')}</span></div>`:'');
     tip.style.display='block';
   }
 
@@ -850,14 +1530,14 @@ function renderNWPulse(history, d, container) {
   if (series.length < 2) { container.innerHTML = ''; return; }
   const now = new Date();
   const daysSince = (dt) => Math.floor((now - dt) / 86400000);
-  const fmtDate = (dt) => dt.toLocaleDateString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit' });
-  const fmtShort = (dt) => dt.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric' });
+  const fmtDate = (dt) => fmtDateLocal(dt, { year:'numeric', month:'2-digit', day:'2-digit' });
+  const fmtShort = (dt) => fmtDateLocal(dt, { month:'numeric', day:'numeric' });
   const fmtVel = (v) => v === null ? '—' : (v >= 0 ? '+' : '−') + '¥' + (Math.abs(v) >= 1e6 ? (Math.abs(v)/1e6).toFixed(2) + 'M' : Math.round(Math.abs(v)/1000) + 'K');
 
   // 1. All-time high
   const ath = series.reduce((a, r) => r.nw > a.nw ? r : a, series[0]);
   const athDays = daysSince(ath.date);
-  const athStr = athDays === 0 ? '今日' : `${athDays}日前`;
+  const athStr = athDays === 0 ? t('pulse.today') : t('pulse.daysAgo', {n: athDays});
 
   // 2. Best/worst single-day Δ in last 30 days
   const cutoff30 = new Date(now - 30*86400000);
@@ -886,7 +1566,9 @@ function renderNWPulse(history, d, container) {
       streakStart = series[i].date;
     }
     const streakDays = daysSince(streakStart);
-    streakRow = `<div class="pulse-row"><span class="pulse-label">¥${(currentMilestone/1e6).toFixed(0)}M ライン</span><span>突破から <span class="pulse-val" style="color:var(--green)">${streakDays}日連続</span></span><span class="pulse-sub">(${fmtDate(streakStart)})</span></div>`;
+    const lineLabel = t('pulse.line', {amt: `¥${(currentMilestone/1e6).toFixed(0)}M`});
+    const streakTxt = t('pulse.streak', {n: `<span class="pulse-val" style="color:var(--green)">${streakDays}</span>`});
+    streakRow = `<div class="pulse-row"><span class="pulse-label">${lineLabel}</span><span>${streakTxt}</span><span class="pulse-sub">(${fmtDate(streakStart)})</span></div>`;
   }
 
   // 4. NW velocity over rolling 3/6/12 months (¥/month)
@@ -903,24 +1585,24 @@ function renderNWPulse(history, d, container) {
   const velColor = (v) => v === null ? 'var(--muted)' : (v >= 0 ? 'var(--green)' : 'var(--red)');
 
   container.innerHTML = `<div class="card pulse-card">
-    <div class="pulse-title">純資産ハイライト</div>
+    <div class="pulse-title">${t('pulse.title')}</div>
     <div class="pulse-row">
-      <span class="pulse-label">史上最高値</span>
+      <span class="pulse-label">${t('pulse.ath')}</span>
       <span class="pulse-val">${fmt(ath.nw)}</span>
       <span class="pulse-sub">${fmtDate(ath.date)} · ${athStr}</span>
     </div>
     ${hasMoves ? `<div class="pulse-row">
-      <span class="pulse-label">直近30日</span>
+      <span class="pulse-label">${t('pulse.last30d')}</span>
       <span class="pulse-val" style="color:var(--green)">▲ ${fmtVel(best.d)}</span><span class="pulse-sub">${fmtShort(best.date)}</span>
       <span class="pulse-val" style="color:var(--red);margin-left:10px">▼ ${fmtVel(worst.d)}</span><span class="pulse-sub">${fmtShort(worst.date)}</span>
     </div>` : ''}
     ${streakRow}
     <div class="pulse-row">
-      <span class="pulse-label">ペース</span>
+      <span class="pulse-label">${t('pulse.pace')}</span>
       <span class="pulse-vel">3M <b style="color:${velColor(v3)}">${fmtVel(v3)}</b></span>
       <span class="pulse-vel">6M <b style="color:${velColor(v6)}">${fmtVel(v6)}</b></span>
       <span class="pulse-vel">12M <b style="color:${velColor(v12)}">${fmtVel(v12)}</b></span>
-      <span class="pulse-sub">/月</span>
+      <span class="pulse-sub">${t('pulse.perMonth')}</span>
     </div>
   </div>`;
 }
@@ -952,18 +1634,22 @@ function renderMilestones(d, waterfallData, rates, container) {
     }
   }
   const timeStr = monthsTo
-    ? monthsTo < 12 ? `約${monthsTo}ヶ月` : `約${Math.floor(monthsTo/12)}年${monthsTo%12?monthsTo%12+'ヶ月':''}`
+    ? monthsTo < 12
+      ? t('ms.months', {n: monthsTo})
+      : (monthsTo % 12 === 0
+        ? t('ms.years', {y: Math.floor(monthsTo/12)})
+        : t('ms.yearsMonths', {y: Math.floor(monthsTo/12), m: monthsTo%12}))
     : null;
 
   const fmtM = v => (v/1e6).toFixed(0)+'M';
   container.innerHTML = `<div class="card" style="padding:12px 16px">
     <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap">
       <div style="display:flex;align-items:baseline;gap:8px">
-        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">純金融資産 次のマイルストーン</span>
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">${t('ms.title')}</span>
         <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">¥${fmtM(next)}</span>
       </div>
       <div style="font-size:12px;color:var(--muted);text-align:right">
-        残り <span style="color:var(--text);font-weight:600;font-variant-numeric:tabular-nums">${fmt(remaining)}</span>
+        ${t('ms.remaining', {amt: `<span style="color:var(--text);font-weight:600;font-variant-numeric:tabular-nums">${fmt(remaining)}</span>`})}
         ${timeStr ? `&ensp;·&ensp;<span style="color:var(--green)">${timeStr}</span>` : ''}
       </div>
     </div>
@@ -1003,19 +1689,19 @@ function renderAnnualContrib(history, container) {
 
   const C = { T1:'#58a6ff', T2:'#d29922', T3a:'#34d399' };
   const rows = [
-    { label:'T1 NISA',   val:t1,  color:C.T1  },
-    { label:'T2 株式',   val:t2,  color:C.T2  },
-    { label:'T3a iDeCo', val:t3a, color:C.T3a },
+    { label:t('annual.row.t1'),  val:t1,  color:C.T1  },
+    { label:t('annual.row.t2'),  val:t2,  color:C.T2  },
+    { label:t('annual.row.t3a'), val:t3a, color:C.T3a },
   ].filter(r => r.val > 0);
 
   // "On pace" = actual vs what a linear year-end pace would give
   // Bar: filled portion = % of year elapsed (the "expected" mark); dot = actual as % of annualised
   const monthsElapsed = now.getMonth() + 1;
   const yearLabel = prevRows.length
-    ? `${now.getFullYear()}年（${monthsElapsed}ヶ月経過・${(yearFrac*100).toFixed(0)}%）`
-    : `${now.getFullYear()}年 MTD`;
+    ? t('annual.yearProgress', {year: now.getFullYear(), months: monthsElapsed, pct: (yearFrac*100).toFixed(0)})
+    : t('annual.yearMtd', {year: now.getFullYear()});
 
-  const rowsHtml = [...rows, { label:'合計', val:total, color:'rgba(255,255,255,0.5)', isTot:true }].map(r => {
+  const rowsHtml = [...rows, { label:t('annual.row.total'), val:total, color:'rgba(255,255,255,0.5)', isTot:true }].map(r => {
     const pace    = annualise(r.val);
     const barFill = Math.min(100, yearFrac * 100);                  // year progress line
     const actual  = Math.min(100, (r.val / Math.max(pace, 1)) * 100); // actual vs pace
@@ -1032,11 +1718,11 @@ function renderAnnualContrib(history, container) {
         <div style="position:absolute;left:0;top:0;height:100%;width:${Math.min(actual,barFill).toFixed(1)}%;background:${r.isTot?'rgba(255,255,255,0.4)':r.color};border-radius:2px"></div>
       </div>
       <span style="font-size:12px;font-variant-numeric:tabular-nums;min-width:80px;text-align:right">+${fmt(r.val)}</span>
-      <span style="font-size:11px;color:${paceColor};min-width:90px;text-align:right" title="年換算ペース">${fmt(Math.round(pace))}<span style="font-size:9px;color:var(--muted)">/年</span></span>
+      <span style="font-size:11px;color:${paceColor};min-width:90px;text-align:right" title="${t('annual.tooltipPace')}">${fmt(Math.round(pace))}<span style="font-size:9px;color:var(--muted)">${t('annual.perYear')}</span></span>
     </div>`;
   }).join('');
 
-  container.innerHTML = `<h2>年次積立サマリー</h2>
+  container.innerHTML = `<h2>${t('annual.title')}</h2>
   <div class="card" style="padding:14px 16px">
     <div style="font-size:11px;color:var(--muted);margin-bottom:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase">${yearLabel}</div>
     ${rowsHtml}
@@ -1072,49 +1758,49 @@ function renderSpendRunway(history, d, rates, container) {
 
   const fmtY = v => fmt(Math.round(v));
   const lifestyleColor = cf.lifestyle < cf.income * 0.5 ? 'var(--green)' : cf.lifestyle < cf.income * 0.75 ? 'var(--yellow)' : 'var(--red)';
+  const yrs = Math.floor(runway.months/12);
+  const mos = runway.months%12;
   const runwayStr = !runway.depleted
-    ? `50年以上持続`
-    : `約 ${Math.floor(runway.months/12)}年${runway.months%12 ? runway.months%12+'ヶ月' : ''}`;
+    ? t('runway.never')
+    : (mos === 0 ? t('runway.years', {y: yrs}) : t('runway.yearsMonths', {y: yrs, m: mos}));
   const runwayColor = !runway.depleted ? 'var(--green)' : runway.months/12 >= 25 ? 'var(--green)' : runway.months/12 >= 10 ? 'var(--yellow)' : 'var(--red)';
   const swrColor = swrCoverage >= 100 ? 'var(--green)' : swrCoverage >= 50 ? 'var(--yellow)' : 'var(--red)';
-
-  const methodTip = "月収から既知の貯蓄系流出 (投資積立, ローン返済, 流動性資産増分, 保険積立) を差し引いた残額。ボーナス月や臨時支出で変動するため複数月の平均で表示。";
 
   container.innerHTML = `<div class="card spend-card">
     <div class="spend-section">
       <div class="spend-title">
-        推定月次支出
-        <span class="spend-sub">(${cf.monthsUsed}ヶ月平均 · 月収から逆算)</span>
-        <span class="spend-info" title="${methodTip}">ⓘ</span>
+        ${t('spend.title')}
+        <span class="spend-sub">${t('spend.subtitle', {n: cf.monthsUsed})}</span>
+        <span class="spend-info" title="${t('spend.tipMethod')}">ⓘ</span>
       </div>
       <div class="spend-row">
-        <span class="spend-label">推定生活費</span>
-        <span class="spend-val" style="color:${lifestyleColor}">${fmtY(cf.lifestyle)}/月</span>
-        <span class="spend-sub">(${(cf.lifestyle/cf.income*100).toFixed(0)}% of 月収)</span>
+        <span class="spend-label">${t('spend.lifestyle')}</span>
+        <span class="spend-val" style="color:${lifestyleColor}">${fmtY(cf.lifestyle)}${t('fire.swr.perMonth')}</span>
+        <span class="spend-sub">${t('spend.lifestylePct', {pct: (cf.lifestyle/cf.income*100).toFixed(0)})}</span>
       </div>
       ${cf.mortgagePmt > 0 ? `<div class="spend-row">
-        <span class="spend-label">住宅ローン</span>
-        <span class="spend-val">${fmtY(cf.mortgagePmt)}/月</span>
-        <span class="spend-sub">元利金等</span>
+        <span class="spend-label">${t('spend.mortgage')}</span>
+        <span class="spend-val">${fmtY(cf.mortgagePmt)}${t('fire.swr.perMonth')}</span>
+        <span class="spend-sub">${t('spend.mortgageNote')}</span>
       </div>` : ''}
       <div class="spend-row total">
-        <span class="spend-label">合計月次バーン</span>
-        <span class="spend-val">${fmtY(cf.totalBurn)}/月</span>
-        <span class="spend-sub">${fmtY(cf.totalBurn*12)}/年</span>
+        <span class="spend-label">${t('spend.totalBurn')}</span>
+        <span class="spend-val">${fmtY(cf.totalBurn)}${t('fire.swr.perMonth')}</span>
+        <span class="spend-sub">${t('spend.perYear', {amt: fmtY(cf.totalBurn*12)})}</span>
       </div>
     </div>
     <div class="spend-divider"></div>
     <div class="spend-section">
-      <div class="spend-title">ランウェイ <span class="spend-sub">(今日仕事を辞めたら)</span></div>
+      <div class="spend-title">${t('runway.title')} <span class="spend-sub">${t('runway.subtitle')}</span></div>
       <div class="spend-row">
-        <span class="spend-label">純金融資産持続期間</span>
+        <span class="spend-label">${t('runway.duration')}</span>
         <span class="spend-val" style="color:${runwayColor}">${runwayStr}</span>
-        <span class="spend-sub">@ 想定利回り ${(annualRate*100).toFixed(1)}%</span>
+        <span class="spend-sub">${t('runway.atRate', {pct: (annualRate*100).toFixed(1)})}</span>
       </div>
       <div class="spend-row">
-        <span class="spend-label">4%ルール カバー率</span>
+        <span class="spend-label">${t('runway.swrCoverage')}</span>
         <span class="spend-val" style="color:${swrColor}">${swrCoverage.toFixed(0)}%</span>
-        <span class="spend-sub">${fmtY(swr)}/年 vs 必要 ${fmtY(cf.totalBurn*12)}/年</span>
+        <span class="spend-sub">${t('runway.swrNote', {swr: fmtY(swr), need: fmtY(cf.totalBurn*12)})}</span>
       </div>
     </div>
   </div>`;
@@ -1128,11 +1814,9 @@ function renderSavingsRate(d, waterfallData, container) {
   const income = d.monthlyIncome;
 
   if (!income) {
-    container.innerHTML = `<h2>月次貯蓄率</h2>
+    container.innerHTML = `<h2>${t('sr.title')}</h2>
       <div class="sr-card">
-        <div style="font-size:12px;color:var(--muted);line-height:1.6">
-          月収が未設定です。Google スプレッドシートの <strong style="color:var(--text)">data clean シート AA24</strong> に月収（手取り）を入力してください。
-        </div>
+        <div style="font-size:12px;color:var(--muted);line-height:1.6">${t('sr.unset')}</div>
       </div>`;
     return;
   }
@@ -1142,7 +1826,9 @@ function renderSavingsRate(d, waterfallData, container) {
   const rateColor = rate >= 25 ? 'var(--green)' : rate >= 15 ? 'var(--yellow)' : 'var(--red)';
   const [yr, mo] = last.month.split('-');
 
-  const periodLabel = last._mtd ? `${parseInt(mo)}月${yr} MTD` : `${parseInt(mo)}月${yr}`;
+  const periodLabel = last._mtd
+    ? t('sr.mtd', {m: parseInt(mo), y: yr})
+    : t('sr.month', {m: parseInt(mo), y: yr});
 
   // Wife's mortgage support — temporary ¥90K/mo through March 2027
   const WIFE_MORTGAGE = 90000;
@@ -1153,21 +1839,21 @@ function renderSavingsRate(d, waterfallData, container) {
 
   const wifeRow = showWifeMortgage ? `
     <div class="sr-commitment-row">
-      <span class="sr-commitment-label">妻ローン負担込み</span>
+      <span class="sr-commitment-label">${t('sr.totalCommit')}</span>
       <span class="sr-commitment-value" style="color:${totalColor}">${totalRate.toFixed(1)}%</span>
-      <span class="sr-commitment-note">+¥90K/mo · through Mar 2027</span>
+      <span class="sr-commitment-note">${t('sr.spouseNote')}</span>
     </div>` : '';
 
-  container.innerHTML = `<h2>月次貯蓄率</h2>
+  container.innerHTML = `<h2>${t('sr.title')}</h2>
     <div class="sr-card">
       <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
         <div>
           <div class="sr-rate" style="color:${rateColor}">${rate.toFixed(1)}%</div>
-          <div class="sr-sub">${fmt(contrib)} 投資 ÷ ${fmt(income)} 月収 &nbsp;·&nbsp; ${periodLabel}</div>
+          <div class="sr-sub">${t('sr.contribOf', {contrib: fmt(contrib), income: fmt(income)})} &nbsp;·&nbsp; ${periodLabel}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">目標</div>
-          <div style="font-size:14px;font-weight:700;color:var(--muted)">25%</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">${t('sr.goal')}</div>
+          <div style="font-size:14px;font-weight:700;color:var(--muted)">${t('sr.target')}</div>
         </div>
       </div>
       <div class="sr-bar-track">
@@ -1204,11 +1890,11 @@ function mdToHtml(text) {
           `<div class="ai-action-row">` +
           `<span class="ai-action-text">${itemText}</span>` +
           `<span class="ai-action-btns">` +
-          `<button class="ai-fb-btn" data-fb="done" title="Mark done">✓</button>` +
-          `<button class="ai-fb-btn" data-fb="skip" title="Skip">✗</button>` +
-          `<button class="ai-fb-btn" data-fb="note" title="Add note">+</button>` +
+          `<button class="ai-fb-btn" data-fb="done" title="${t('ai.fb.markDone')}">✓</button>` +
+          `<button class="ai-fb-btn" data-fb="skip" title="${t('ai.fb.skip')}">✗</button>` +
+          `<button class="ai-fb-btn" data-fb="note" title="${t('ai.fb.addNote')}">+</button>` +
           `</span></div>` +
-          `<div class="ai-note-area" style="display:none"><input class="ai-note-input" placeholder="Add context…"></div>` +
+          `<div class="ai-note-area" style="display:none"><input class="ai-note-input" placeholder="${t('ai.fb.notePlaceholder')}"></div>` +
           `</li>`;
         actionIdx++;
       } else {
@@ -1337,21 +2023,23 @@ function buildMoMBlock(d, waterfallData) {
   const prevNW = d.totalNetWorth - last.total;
   const momPct = prevNW ? (last.total / prevNW * 100) : 0;
   const [yr, mo] = last.month.split('-');
-  const monthLabel = last._mtd ? `${yr}年${parseInt(mo)}月 MTD` : `${yr}年${parseInt(mo)}月`;
+  const monthLabel = last._mtd
+    ? t('sr.mtd', {m: parseInt(mo), y: yr})
+    : t('sr.month', {m: parseInt(mo), y: yr});
   const totalColor = last.total >= 0 ? 'var(--green)' : 'var(--red)';
   const MC = { t1:'#58a6ff', t2:'#d29922', t3a:'#34d399', retPos:'#3fb950', retNeg:'#f85149', mort:'#bc8cff', re:'#f0883e' };
 
   // Drivers — filter zero, track key for biggest
   const allDrivers = [
-    { key:'contrib', label:'資金追加', val:last.contrib,         color:MC.t1,
+    { key:'contrib', label:t('mom.contrib'), val:last.contrib, color:MC.t1,
       subs: (last.contrib > 0 && (last.t2Contrib || last.t3aContrib))
-        ? [{ label:'T1 NISA', val:last.t1Contrib, color:MC.t1 },
-           { label:'T2 株式', val:last.t2Contrib, color:MC.t2 },
-           { label:'T3a iDeCo', val:last.t3aContrib, color:MC.t3a }].filter(s => s.val)
+        ? [{ label:t('annual.row.t1'),  val:last.t1Contrib,  color:MC.t1 },
+           { label:t('annual.row.t2'),  val:last.t2Contrib,  color:MC.t2 },
+           { label:t('annual.row.t3a'), val:last.t3aContrib, color:MC.t3a }].filter(s => s.val)
         : [] },
-    { key:'returns', label:'運用損益',   val:last.returns,         color:last.returns >= 0 ? MC.retPos : MC.retNeg, subs:[] },
-    { key:'mort',    label:'ローン返済', val:last.mortgagePaydown, color:MC.mort, subs:[] },
-    { key:'re',      label:'不動産変動', val:last.reChange,        color:MC.re,   subs:[] },
+    { key:'returns', label:t('mom.returns'),         val:last.returns,         color:last.returns >= 0 ? MC.retPos : MC.retNeg, subs:[] },
+    { key:'mort',    label:t('mom.mortgagePaydown'), val:last.mortgagePaydown, color:MC.mort, subs:[] },
+    { key:'re',      label:t('mom.reChange'),        val:last.reChange,        color:MC.re,   subs:[] },
   ].filter(dr => dr.val !== 0);
 
   if (!allDrivers.length) return '';
@@ -1366,7 +2054,7 @@ function buildMoMBlock(d, waterfallData) {
   // Driver rows
   const driverRows = allDrivers.map(dr => {
     const pct = last.total ? Math.round(Math.abs(dr.val) / Math.abs(last.total) * 100) : 0;
-    const badge = dr.key === biggest.key ? `<span class="ai-mom-badge">最大</span>` : '';
+    const badge = dr.key === biggest.key ? `<span class="ai-mom-badge">${t('mom.badge.biggest')}</span>` : '';
     const valColor = dr.val >= 0 ? 'var(--green)' : 'var(--red)';
     const mainRow = `<div class="ai-mom-row">
       <div class="ai-mom-dot" style="background:${dr.color}"></div>
@@ -1401,7 +2089,7 @@ function renderMoMSnapshot(d, waterfallData, container) {
   if (!container) return;
   const block = buildMoMBlock(d, waterfallData);
   if (!block) { container.innerHTML = ''; return; }
-  container.innerHTML = `<h2>月次変動内訳</h2><div class="card" style="padding:12px 14px;margin-bottom:10px">${block}</div>`;
+  container.innerHTML = `<h2>${t('mom.title')}</h2><div class="card" style="padding:12px 14px;margin-bottom:10px">${block}</div>`;
 }
 
 function buildMoMParam(waterfallData) {
@@ -1439,8 +2127,8 @@ function renderAISummary(d, waterfallData, container) {
 
   let tsLabel = '';
   if (tsRaw) {
-    try { tsLabel = 'Generated: ' + new Date(tsRaw).toLocaleDateString('en-US', {year:'numeric',month:'short',day:'numeric'}); }
-    catch(_) { tsLabel = 'Generated: ' + tsRaw; }
+    try { tsLabel = t('ai.generated', {ts: fmtDateLocal(new Date(tsRaw), {year:'numeric',month:'short',day:'numeric'})}); }
+    catch(_) { tsLabel = t('ai.generated', {ts: tsRaw}); }
   }
 
   let bodyHtml;
@@ -1454,13 +2142,13 @@ function renderAISummary(d, waterfallData, container) {
     </div>`;
   } else {
     bodyHtml = `<div class="ai-text" id="aiSummaryText">${
-      summary ? mdToHtml(summary) : '<span class="ai-placeholder">No summary yet — click ✦ Generate to create your first monthly snapshot</span>'
+      summary ? mdToHtml(summary) : `<span class="ai-placeholder">${t('ai.placeholder')}</span>`
     }</div>`;
   }
 
   // Extract plain-text preview: first 1-2 sentences of actual content (skip headings)
   const previewText = (() => {
-    if (!summary) return tsLabel ? `${tsLabel} — click to expand` : 'Click to expand';
+    if (!summary) return tsLabel ? `${tsLabel} — ${t('ai.clickToExpand')}` : t('ai.clickToExpand');
     const firstPara = summary.split('\n')
       .map(l => l.trim())
       .filter(l => l && !l.startsWith('#') && !l.startsWith('==='))
@@ -1472,7 +2160,7 @@ function renderAISummary(d, waterfallData, container) {
   container.innerHTML = `
     <h2 id="aiToggle" style="cursor:pointer;user-select:none">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span>AI サマリー</span>
+        <span>${t('ai.title')}</span>
         <span id="aiChevron" style="font-size:11px;color:var(--muted);transition:transform .2s;flex-shrink:0">&rsaquo;</span>
       </div>
       <div id="aiPreview" style="font-size:12px;font-weight:400;color:var(--muted);margin-top:3px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${previewText}</div>
@@ -1482,7 +2170,7 @@ function renderAISummary(d, waterfallData, container) {
         ${bodyHtml}
         <div class="ai-footer">
           <span class="ai-ts" id="aiSummaryDate">${tsLabel}</span>
-          ${scriptUrl ? `<button class="btn" id="aiGenerateBtn" style="font-size:11px;padding:5px 14px">✦ Generate</button>` : ''}
+          ${scriptUrl ? `<button class="btn" id="aiGenerateBtn" style="font-size:11px;padding:5px 14px">${t('ai.generate')}</button>` : ''}
         </div>
       </div>
     </div>`;
@@ -1544,9 +2232,9 @@ async function regenerateSummary(d, waterfallData) {
   const textEl = document.getElementById('aiSummaryText');
   function setMsg(html) { if (textEl) textEl.innerHTML = html; }
 
-  btn.textContent = '⏳ Generating…';
+  btn.textContent = t('ai.btn.generating');
   btn.disabled = true;
-  setMsg('<span class="ai-placeholder">Triggering Gemini — reloading in 30 seconds…</span>');
+  setMsg(`<span class="ai-placeholder">${t('ai.generating')}</span>`);
 
   // Build URL params: feedback (fb) + MoM snapshot (mom)
   const fb  = buildFeedbackParam();
@@ -1568,10 +2256,10 @@ async function regenerateSummary(d, waterfallData) {
   const tick = setInterval(() => {
     secs--;
     if (secs > 0) {
-      setMsg(`<span class="ai-placeholder">Waiting for Gemini… reloading in ${secs}s &nbsp;<span style="font-size:10px;color:var(--muted)">(check Apps Script execution logs if it fails)</span></span>`);
+      setMsg(`<span class="ai-placeholder">${t('ai.waiting', {s: secs})} &nbsp;<span style="font-size:10px;color:var(--muted)">${t('ai.waitingNote')}</span></span>`);
     } else {
       clearInterval(tick);
-      setMsg('<span class="ai-placeholder">Reloading data…</span>');
+      setMsg(`<span class="ai-placeholder">${t('ai.reloading')}</span>`);
       // Clear feedback — it's been sent to the prompt, fresh start after reload
       localStorage.removeItem('wt_ai_feedback');
       loadAndRender();
@@ -1582,7 +2270,7 @@ async function regenerateSummary(d, waterfallData) {
 // ── FIRE Progress Bar ─────────────────────────────────────────────────────────
 function renderFireBar(d, container) {
   if (!d.fireNumber || d.fireNumber <= 0) {
-    container.innerHTML=`<div class="fire-card" style="color:var(--muted);font-size:12px">FIRE目標が未設定です（data clean シート AA22 に目標純金融資産額を入力してください）</div>`;
+    container.innerHTML=`<div class="fire-card" style="color:var(--muted);font-size:12px">${t('fire.unset')}</div>`;
     return;
   }
 
@@ -1615,8 +2303,12 @@ function renderFireBar(d, container) {
 
   // 4% rule (safe withdrawal rate) — annual + monthly, current vs at-goal
   const SWR = 0.04;
-  const fmtY = v => '¥' + (v >= 1e7 ? (v/1e6).toFixed(1)+'M' : Math.round(v/1e4)+'万');
-  const fmtM = v => '¥' + Math.round(v).toLocaleString('ja-JP');
+  const fmtY = v => {
+    if (v >= 1e7) return '¥' + (v/1e6).toFixed(1) + 'M';
+    if (_lang === 'ja') return '¥' + Math.round(v/1e4) + '万';
+    return '¥' + (v/1e3).toFixed(0) + 'K';
+  };
+  const fmtM = v => '¥' + Math.round(v).toLocaleString(_lang==='ja'?'ja-JP':'en-US');
   const curAnnual  = nfa * SWR;
   const curMonthly = curAnnual / 12;
   const tgtAnnual  = target * SWR;
@@ -1627,11 +2319,11 @@ function renderFireBar(d, container) {
       <div class="fire-header">
         <div>
           <span class="fire-pct ${isAchieved?'gain':''}">${pct.toFixed(1)}%</span>
-          <span class="fire-meta" style="margin-left:10px">${isAchieved ? '🎉 FIRE 達成！' : `残り ${fmt(remaining)}`}</span>
+          <span class="fire-meta" style="margin-left:10px">${isAchieved ? t('fire.achieved') : t('fire.remaining', {amt: fmt(remaining)})}</span>
         </div>
         <div class="fire-meta" style="text-align:right">
-          純金融資産 ${fmt(nfa)}<br>
-          FIRE 目標 ${fmt(target)}
+          ${t('fire.nfa')} ${fmt(nfa)}<br>
+          ${t('fire.target')} ${fmt(target)}
         </div>
       </div>
       <div class="fire-track" style="position:relative">
@@ -1644,14 +2336,14 @@ function renderFireBar(d, container) {
         <span style="position:absolute;right:0">${fmt(target)}</span>
       </div>
       <div class="fire-swr">
-        <div class="fire-swr-title">4% ルール 安全引き出し率</div>
+        <div class="fire-swr-title">${t('fire.swr.title')}</div>
         <div class="fire-swr-row">
-          <span class="fire-swr-label">現在 (純金融資産 ${fmtY(nfa)} × 4%)</span>
-          <span class="fire-swr-vals">${fmtM(curMonthly)}/月<span class="sep">·</span>${fmtM(curAnnual)}/年</span>
+          <span class="fire-swr-label">${t('fire.swr.current', {nfa: fmtY(nfa)})}</span>
+          <span class="fire-swr-vals">${fmtM(curMonthly)}${t('fire.swr.perMonth')}<span class="sep">·</span>${fmtM(curAnnual)}${t('fire.swr.perYear')}</span>
         </div>
         <div class="fire-swr-row">
-          <span class="fire-swr-label">目標達成時 (${fmtY(target)} × 4%)</span>
-          <span class="fire-swr-vals" style="color:var(--green)">${fmtM(tgtMonthly)}/月<span class="sep">·</span>${fmtM(tgtAnnual)}/年</span>
+          <span class="fire-swr-label">${t('fire.swr.atGoal', {target: fmtY(target)})}</span>
+          <span class="fire-swr-vals" style="color:var(--green)">${fmtM(tgtMonthly)}${t('fire.swr.perMonth')}<span class="sep">·</span>${fmtM(tgtAnnual)}${t('fire.swr.perYear')}</span>
         </div>
       </div>
     </div>`;
@@ -1819,7 +2511,10 @@ function renderWaterfallChart(history, container) {
     const [yr,mo]=d.month.split('-');
     const moNum=parseInt(mo);
     const showYear=i===0||mo==='01';
-    const label=d._mtd?`${moNum}月 MTD`:showYear?`'${yr.slice(2)}/${moNum}月`:`${moNum}月`;
+    const monShort = new Date(parseInt(yr), moNum-1, 1).toLocaleDateString(_lang==='ja'?'ja-JP':'en-US', {month:'short'});
+    const label = d._mtd
+      ? `${monShort} MTD`
+      : (showYear ? `'${yr.slice(2)} ${monShort}` : monShort);
     const isFirst=i===0, isLast=i===n-1;
     const anchor=isFirst?'start':isLast?'end':'middle';
     const lx=isFirst?Math.max(cx,PL+2):isLast?Math.min(cx,W-PR-2):cx;
@@ -1835,24 +2530,24 @@ function renderWaterfallChart(history, container) {
   const velSlice = data.slice(-3);
   const velAvg = velSlice.length ? velSlice.reduce((s,m)=>s+m.total,0)/velSlice.length : 0;
   const velColor = velAvg>=0 ? 'var(--green)' : 'var(--red)';
-  const velLbl = velSlice.length>=3 ? '過去3ヶ月平均' : `過去${velSlice.length}ヶ月平均`;
+  const velLbl = velSlice.length>=3 ? t('wf.velocityAvg3') : t('wf.velocityAvgN', {n: velSlice.length});
 
   container.innerHTML=`<div class="wfall-card">
     <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-      <h2 style="margin:0">月次 NW 変動内訳${isMtd?' <span style="font-size:11px;font-weight:400;color:var(--muted)">(MTD)</span>':''}</h2>
-      <div style="margin-left:auto;font-size:12px;color:var(--muted)">増加ペース&ensp;<span style="color:${velColor};font-weight:700;font-variant-numeric:tabular-nums">${velAvg>=0?'+':''}${fmt(velAvg)}<span style="font-size:10px;font-weight:400">/月</span></span>&ensp;<span style="font-size:10px">(${velLbl})</span></div>
+      <h2 style="margin:0">${t('wf.title')}${isMtd?` <span style="font-size:11px;font-weight:400;color:var(--muted)">${t('wf.mtdInline')}</span>`:''}</h2>
+      <div style="margin-left:auto;font-size:12px;color:var(--muted)">${t('wf.velocityPace')}&ensp;<span style="color:${velColor};font-weight:700;font-variant-numeric:tabular-nums">${velAvg>=0?'+':''}${fmt(velAvg)}<span style="font-size:10px;font-weight:400">${t('pulse.perMonth')}</span></span>&ensp;<span style="font-size:10px">(${velLbl})</span></div>
     </div>
     <svg id="wfSvg" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
       ${grid}${yLbl}${xLbl}${zeroLine}${bars}${hair}${overlay}
     </svg>
     <div class="wfall-legend">
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t1}"></div>T1 NISA</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t2}"></div>T2 株式</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t3a}"></div>T3a iDeCo</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retPos}"></div>運用益</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retNeg}"></div>運用損</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.mortgage}"></div>ローン返済</div>
-      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.rePos}"></div>不動産変動</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t1}"></div>${t('wf.legend.t1')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t2}"></div>${t('wf.legend.t2')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.t3a}"></div>${t('wf.legend.t3a')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retPos}"></div>${t('wf.legend.retPos')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.retNeg}"></div>${t('wf.legend.retNeg')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.mortgage}"></div>${t('wf.legend.mortgage')}</div>
+      <div class="wfall-legend-item"><div class="wfall-legend-dot" style="background:${C.rePos}"></div>${t('wf.legend.re')}</div>
     </div>
     <div id="wfTip" class="chart-tip"></div>
   </div>`;
@@ -1875,14 +2570,15 @@ function renderWaterfallChart(history, container) {
     tipEl.style.top=Math.max(0,tipY-90)+'px';
     const pct=(v,tot)=>tot?` <span style="color:#6b7888;font-size:10px">(${Math.round(Math.abs(v)/Math.abs(tot)*100)}%)</span>`:'';
     const bkLine=(col,label,val,pctBase)=>val?`<div style="color:${col};margin-bottom:1px;padding-left:10px;font-size:11px">${label} ${fd(val)}${pct(val,pctBase)}</div>`:'';
-    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${yr}年${parseInt(mo)}月${pt._mtd?' MTD':''}　合計 <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
-      (pt.contrib?`<div style="color:${C.t1};margin-bottom:1px">資金追加　　${fd(pt.contrib)}</div>`+
-        bkLine(C.t1,  'T1 NISA  ', pt.t1Contrib,  pt.contrib)+
-        bkLine(C.t2,  'T2 株式  ', pt.t2Contrib,  pt.contrib)+
-        bkLine(C.t3a, 'T3a iDeCo', pt.t3aContrib, pt.contrib):'')+
-      `<div style="color:${pt.returns>=0?C.retPos:C.retNeg};margin-bottom:2px;margin-top:${pt.contrib?'4':'0'}px">運用損益　　${fd(pt.returns)}</div>`+
-      `<div style="color:${C.mortgage};margin-bottom:2px">ローン返済　${fd(pt.mortgagePaydown)}</div>`+
-      (Math.abs(pt.reChange)>1000?`<div style="color:${C.rePos}">不動産変動　${fd(pt.reChange)}</div>`:'');
+    const monthLbl = pt._mtd ? t('sr.mtd', {m: parseInt(mo), y: yr}) : t('sr.month', {m: parseInt(mo), y: yr});
+    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:6px;font-size:11px">${monthLbl}　${t('wf.tipTotal')} <span style="color:${pt.total>=0?C.retPos:C.retNeg}">${fd(pt.total)}</span></div>`+
+      (pt.contrib?`<div style="color:${C.t1};margin-bottom:1px">${t('wf.legend.contrib')}　　${fd(pt.contrib)}</div>`+
+        bkLine(C.t1,  t('wf.legend.t1'),  pt.t1Contrib,  pt.contrib)+
+        bkLine(C.t2,  t('wf.legend.t2'),  pt.t2Contrib,  pt.contrib)+
+        bkLine(C.t3a, t('wf.legend.t3a'), pt.t3aContrib, pt.contrib):'')+
+      `<div style="color:${pt.returns>=0?C.retPos:C.retNeg};margin-bottom:2px;margin-top:${pt.contrib?'4':'0'}px">${t('wf.legend.returns')}　　${fd(pt.returns)}</div>`+
+      `<div style="color:${C.mortgage};margin-bottom:2px">${t('wf.legend.mortgage')}　${fd(pt.mortgagePaydown)}</div>`+
+      (Math.abs(pt.reChange)>1000?`<div style="color:${C.rePos}">${t('wf.legend.re')}　${fd(pt.reChange)}</div>`:'');
     tipEl.style.display='block';
   });
   ovEl.addEventListener('mouseleave',()=>{ hlEl.setAttribute('visibility','hidden'); tipEl.style.display='none'; });
@@ -1908,7 +2604,7 @@ function renderPassiveIncomeChart(history, d, container) {
   }
   const data = [...monthMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-24);
   if (!data.length) {
-    container.innerHTML = `<div class="wfall-card" style="color:var(--muted);font-size:12px;text-align:center;padding:30px 16px">パッシブ収入の履歴データがまだありません</div>`;
+    container.innerHTML = `<div class="wfall-card" style="color:var(--muted);font-size:12px;text-align:center;padding:30px 16px">${t('pi.empty')}</div>`;
     return;
   }
 
@@ -1936,7 +2632,7 @@ function renderPassiveIncomeChart(history, d, container) {
   if (target > 0 && target <= dataMax) {
     const yt = ys(target).toFixed(1);
     targetLine = `<line x1="${PL}" y1="${yt}" x2="${W-PR}" y2="${yt}" stroke="rgba(63,185,80,0.5)" stroke-width="1" stroke-dasharray="5,4"/>
-      <text x="${W-PR+4}" y="${yt}" dominant-baseline="middle" fill="rgba(63,185,80,0.7)" font-size="9">目標</text>`;
+      <text x="${W-PR+4}" y="${yt}" dominant-baseline="middle" fill="rgba(63,185,80,0.7)" font-size="9">${t('pi.target')}</text>`;
   }
 
   // Bars + x-labels
@@ -1951,7 +2647,8 @@ function renderPassiveIncomeChart(history, d, container) {
     const isFirst=i===0, isLast=i===n-1;
     const anchor=isFirst?'start':isLast?'end':'middle';
     const lx=isFirst?Math.max(cx,PL+2):isLast?Math.min(cx,W-PR-2):cx;
-    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+16}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${showYear?`'${yr.slice(2)}/`:''  }${moNum}月</text>`;
+    const monthShort = new Date(parseInt(yr), moNum-1, 1).toLocaleDateString(_lang==='ja'?'ja-JP':'en-US', {month:'short'});
+    xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+16}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${showYear?`'${yr.slice(2)} `:''}${monthShort}</text>`;
     tipData.push({ month, val, cx });
   });
 
@@ -1980,12 +2677,13 @@ function renderPassiveIncomeChart(history, d, container) {
     const cx=pt.cx.toFixed(1);
     hlEl.setAttribute('x1',cx); hlEl.setAttribute('x2',cx); hlEl.setAttribute('visibility','visible');
     const [yr,mo]=pt.month.split('-');
-    const pctOfTarget = target>0 ? ` (目標の${(pt.val/target*100).toFixed(0)}%)` : '';
+    const pctOfTarget = target>0 ? ' ' + t('pi.ofTarget', {pct: (pt.val/target*100).toFixed(0)}) : '';
     const tipX=e.clientX-rect.left, flip=tipX>rect.width*0.6;
     tipEl.style.left=flip?'auto':(tipX+12)+'px';
     tipEl.style.right=flip?(rect.width-tipX+12)+'px':'auto';
     tipEl.style.top=Math.max(0,e.clientY-rect.top-60)+'px';
-    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:4px;font-size:11px">${yr}年${parseInt(mo)}月</div>
+    const monthLbl = t('sr.month', {m: parseInt(mo), y: yr});
+    tipEl.innerHTML=`<div style="font-weight:700;color:#6b7888;margin-bottom:4px;font-size:11px">${monthLbl}</div>
       <div style="color:${target>0&&pt.val>=target?'var(--green)':'#58a6ff'};font-variant-numeric:tabular-nums">${fmt(pt.val)}${pctOfTarget}</div>`;
     tipEl.style.display='block';
   });
@@ -2004,7 +2702,7 @@ function renderMortgageSimulator(d, container) {
   const baseMonths=baseArr.length-1;
   const baseTotalInterest=pmt*baseMonths-balance;
 
-  function ym(months){ const d=new Date(); d.setMonth(d.getMonth()+months); return `${d.getFullYear()}年${d.getMonth()+1}月`; }
+  function ym(months){ const dt=new Date(); dt.setMonth(dt.getMonth()+months); return fmtDateLocal(dt, {year:'numeric', month: _lang==='ja'?'numeric':'short'}); }
 
   function drawSim(extra){
     const accel=computeAmortization(balance,mr,pmt,extra);
@@ -2014,8 +2712,16 @@ function renderMortgageSimulator(d, container) {
 
     document.getElementById('msimPayoff').textContent=ym(accelMonths);
     const smEl=document.getElementById('msimSavedM'), siEl=document.getElementById('msimSavedI');
-    if(savedM>0){ smEl.textContent=`${Math.floor(savedM/12)}年${savedM%12}ヶ月`; smEl.style.color='var(--green)'; siEl.textContent=fmt(Math.round(savedI)); siEl.style.color='var(--green)'; }
-    else { smEl.textContent='—'; smEl.style.color='var(--muted)'; siEl.textContent='—'; siEl.style.color='var(--muted)'; }
+    if(savedM>0){
+      const y = Math.floor(savedM/12), m = savedM%12;
+      smEl.textContent = m === 0 ? t('msim.years', {y}) : t('msim.yearsMonths', {y, m});
+      smEl.style.color='var(--green)';
+      siEl.textContent=fmt(Math.round(savedI));
+      siEl.style.color='var(--green)';
+    } else {
+      smEl.textContent='—'; smEl.style.color='var(--muted)';
+      siEl.textContent='—'; siEl.style.color='var(--muted)';
+    }
 
     // Chart
     const W=800,H=160,PL=68,PR=20,PT=10,PB=28, cW=W-PL-PR,cH=H-PT-PB;
@@ -2024,41 +2730,41 @@ function renderMortgageSimulator(d, container) {
     const bp=baseArr.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
     const ap=accel.map((v,i)=>`${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(' ');
     let grid='',xLbl='',yLbl='';
-    for(let yr=0;yr<=MORTGAGE_TERM_YEARS;yr+=5){ const x=xs(yr*12); const isFirst=yr===0,isLast=yr===MORTGAGE_TERM_YEARS; const anchor=isFirst?'start':isLast?'end':'middle'; const lx=isFirst?x+2:isLast?x-2:x; grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`; xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${yr}年</text>`; }
+    for(let yr=0;yr<=MORTGAGE_TERM_YEARS;yr+=5){ const x=xs(yr*12); const isFirst=yr===0,isLast=yr===MORTGAGE_TERM_YEARS; const anchor=isFirst?'start':isLast?'end':'middle'; const lx=isFirst?x+2:isLast?x-2:x; grid+=`<line x1="${x.toFixed(1)}" y1="${PT}" x2="${x.toFixed(1)}" y2="${H-PB}" stroke="rgba(255,255,255,0.04)"/>`; xLbl+=`<text x="${lx.toFixed(1)}" y="${H-PB+14}" text-anchor="${anchor}" fill="#6b7888" font-size="10">${t('proj.yr', {n: yr})}</text>`; }
     for(let i=0;i<=3;i++){ const v=balance*i/3, y=ys(v).toFixed(1); grid+=`<line x1="${PL}" y1="${y}" x2="${W-PR}" y2="${y}" stroke="rgba(255,255,255,0.04)"/>`; yLbl+=`<text x="${PL-6}" y="${y}" text-anchor="end" dominant-baseline="middle" fill="#6b7888" font-size="10">${(v/1e6).toFixed(0)}M</text>`; }
     document.getElementById('msimChart').innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block">${grid}${yLbl}${xLbl}
       <polyline points="${bp}" fill="none" stroke="rgba(248,81,73,0.35)" stroke-width="1.5" stroke-dasharray="5,3"/>
       <polyline points="${ap}" fill="none" stroke="${extra>0?'#3fb950':'rgba(248,81,73,0.6)'}" stroke-width="2.5"/>
-      <text x="${PL+6}" y="${PT+11}" fill="rgba(248,81,73,0.5)" font-size="9">元のペース</text>
-      ${extra>0?`<text x="${xs(accelMonths).toFixed(1)}" y="${ys(0)+14}" fill="#3fb950" font-size="9" text-anchor="middle">完済</text>`:''}
+      <text x="${PL+6}" y="${PT+11}" fill="rgba(248,81,73,0.5)" font-size="9">${t('msim.basePace')}</text>
+      ${extra>0?`<text x="${xs(accelMonths).toFixed(1)}" y="${ys(0)+14}" fill="#3fb950" font-size="9" text-anchor="middle">${t('msim.paid')}</text>`:''}
     </svg>`;
   }
 
   container.innerHTML=`
     <h2 id="msimToggle" style="cursor:pointer;display:flex;align-items:center;justify-content:space-between;user-select:none;padding:8px 0;margin-top:10px;margin-bottom:0">
-      住宅ローンシミュレーター
+      ${t('msim.title')}
       <span id="msimChevron" style="font-size:9px;color:var(--muted);transition:transform .2s;display:inline-block">▶</span>
     </h2>
     <div id="msimBody" style="display:none">
       <div class="msim-card">
         <div class="msim-stats">
-          <div class="msim-stat"><div class="msim-stat-label">残高</div><div class="msim-stat-val">${fmt(balance)}</div></div>
-          <div class="msim-stat"><div class="msim-stat-label">月額返済</div><div class="msim-stat-val">${fmt(Math.round(pmt))}</div></div>
-          <div class="msim-stat"><div class="msim-stat-label">残り期間</div><div class="msim-stat-val">${Math.floor(baseMonths/12)}年${baseMonths%12}ヶ月</div></div>
-          <div class="msim-stat"><div class="msim-stat-label">残り利息</div><div class="msim-stat-val loss">${fmt(Math.round(baseTotalInterest))}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">${t('msim.balance')}</div><div class="msim-stat-val">${fmt(balance)}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">${t('msim.monthlyPmt')}</div><div class="msim-stat-val">${fmt(Math.round(pmt))}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">${t('msim.remaining')}</div><div class="msim-stat-val">${(baseMonths%12===0) ? t('msim.years',{y:Math.floor(baseMonths/12)}) : t('msim.yearsMonths',{y:Math.floor(baseMonths/12), m:baseMonths%12})}</div></div>
+          <div class="msim-stat"><div class="msim-stat-label">${t('msim.remainingInterest')}</div><div class="msim-stat-val loss">${fmt(Math.round(baseTotalInterest))}</div></div>
         </div>
         <div class="msim-slider-row">
-          <span class="msim-slider-label">毎月の追加返済</span>
+          <span class="msim-slider-label">${t('msim.extra')}</span>
           <input type="range" id="msimSlider" class="msim-slider" min="0" max="500000" step="10000" value="0">
           <span id="msimSliderVal" class="msim-slider-val">¥0</span>
         </div>
         <div class="msim-result">
-          <div class="msim-result-item"><div class="msim-result-label">期間短縮</div><div id="msimSavedM" class="msim-result-val" style="color:var(--muted)">—</div></div>
-          <div class="msim-result-item"><div class="msim-result-label">利息節約</div><div id="msimSavedI" class="msim-result-val" style="color:var(--muted)">—</div></div>
-          <div class="msim-result-item"><div class="msim-result-label">完済予定</div><div id="msimPayoff" class="msim-result-val" style="color:var(--text);font-size:13px">${ym(baseMonths)}</div></div>
+          <div class="msim-result-item"><div class="msim-result-label">${t('msim.timeSaved')}</div><div id="msimSavedM" class="msim-result-val" style="color:var(--muted)">—</div></div>
+          <div class="msim-result-item"><div class="msim-result-label">${t('msim.interestSaved')}</div><div id="msimSavedI" class="msim-result-val" style="color:var(--muted)">—</div></div>
+          <div class="msim-result-item"><div class="msim-result-label">${t('msim.payoffDate')}</div><div id="msimPayoff" class="msim-result-val" style="color:var(--text);font-size:13px">${ym(baseMonths)}</div></div>
         </div>
         <div id="msimChart"></div>
-        <div style="margin-top:8px;font-size:10px;color:var(--muted)">金利 ${(MORTGAGE_RATE*100).toFixed(2)}% ／ 元利金等払い ／ 現在残高ベースで計算</div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted)">${t('msim.footer', {rate: (MORTGAGE_RATE*100).toFixed(2)})}</div>
       </div>
     </div>`;
 
@@ -2074,11 +2780,11 @@ function renderMortgageSimulator(d, container) {
   });
 
   const slider=document.getElementById('msimSlider'), valEl=document.getElementById('msimSliderVal');
-  slider.addEventListener('input',()=>{ valEl.textContent='¥'+parseInt(slider.value).toLocaleString('ja-JP'); drawSim(parseInt(slider.value)); });
+  slider.addEventListener('input',()=>{ valEl.textContent='¥'+parseInt(slider.value).toLocaleString(_lang==='ja'?'ja-JP':'en-US'); drawSim(parseInt(slider.value)); });
 }
 
 function buildHistoryChart(history, period) {
-  if (!history || history.length < 2) return '<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">履歴データがありません</p>';
+  if (!history || history.length < 2) return `<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">${t('hc.empty')}</p>`;
 
   // Compute total NW and cost basis per row
   function rowNW(r) {
@@ -2089,7 +2795,7 @@ function buildHistoryChart(history, period) {
   }
 
   const all = history.map(r=>({date:r.date, nw:rowNW(r), cost:rowCost(r)})).filter(r=>r.nw!==0);
-  if (!all.length) return '<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">履歴データがありません</p>';
+  if (!all.length) return `<p style="color:var(--muted);text-align:center;padding:30px 0;font-size:12px">${t('hc.empty')}</p>`;
 
   // Filter to period
   const now = new Date();
@@ -2143,7 +2849,7 @@ function buildHistoryChart(history, period) {
   const labelIdxs=[0, Math.floor(n/4), Math.floor(n/2), Math.floor(3*n/4), n-1];
   const seen=new Set();
   labelIdxs.forEach((idx,pos)=>{
-    const lbl=data[idx].date.toLocaleDateString('ja-JP',{month:'short',day:'numeric'});
+    const lbl=fmtDateLocal(data[idx].date,{month:'short',day:'numeric'});
     if(seen.has(lbl))return; seen.add(lbl);
     const isFirst=pos===0, isLast=pos===labelIdxs.length-1||idx===n-1;
     const anchor=isFirst?'start':isLast?'end':'middle';
@@ -2212,10 +2918,10 @@ function setupHChartInteraction(info) {
     tip.style.left=flipLeft?'auto':(tipX+12)+'px';
     tip.style.right=flipLeft?(rect.width-tipX+12)+'px':'auto';
     tip.style.top=Math.max(0,tipY-60)+'px';
-    const lbl=pt.date.toLocaleDateString('ja-JP',{year:'numeric',month:'short',day:'numeric'});
+    const lbl=fmtDateLocal(pt.date,{year:'numeric',month:'short',day:'numeric'});
     tip.innerHTML=`<div style="font-size:11px;color:#6b7888;margin-bottom:4px;font-weight:700">${lbl}</div>`+
-      `<div style="margin-bottom:2px">純資産 ${fmt(pt.nw)}</div>`+
-      (pt.cost>0?`<div style="color:rgba(255,255,255,0.4)">簿価合計 ${fmt(pt.cost)}</div>`:'');
+      `<div style="margin-bottom:2px">${t('hc.nw')} ${fmt(pt.nw)}</div>`+
+      (pt.cost>0?`<div style="color:rgba(255,255,255,0.4)">${t('hc.cost')} ${fmt(pt.cost)}</div>`:'');
     tip.style.display='block';
   });
 
@@ -2234,7 +2940,8 @@ function setupHChartInteraction(info) {
 }
 
 function renderHistoryChart(history, container) {
-  const periods=['7D','4W','YTD','1Y','All'];
+  // Period keys are stable; labels come from i18n
+  const periods=[['7D','hc.period.7d'],['4W','hc.period.4w'],['YTD','hc.period.ytd'],['1Y','hc.period.1y'],['All','hc.period.all']];
   let activePeriod='All';
 
   function draw() {
@@ -2249,12 +2956,12 @@ function renderHistoryChart(history, container) {
             <span id="hcDelta" class="hchart-delta ${isGain?'gain':'loss'}">${isGain?'+':''}${fmt(delta)} (${isGain?'+':''}${pct.toFixed(2)}%)</span>
           </div>
           <div class="hchart-periods">
-            ${periods.map(p=>`<button class="hchart-period${p===activePeriod?' active':''}" data-p="${p}">${p}</button>`).join('')}
+            ${periods.map(([key,labelKey])=>`<button class="hchart-period${key===activePeriod?' active':''}" data-p="${key}">${t(labelKey)}</button>`).join('')}
           </div>
         </div>
         ${svgStr}
         <div style="margin-top:6px;font-size:10px;color:var(--muted)">
-          <span style="border-bottom:1.5px solid rgba(255,255,255,0.25);display:inline-block;width:16px;margin-right:4px;vertical-align:middle"></span>簿価合計（T1 Index + T2 + iDeCo）
+          <span style="border-bottom:1.5px solid rgba(255,255,255,0.25);display:inline-block;width:16px;margin-right:4px;vertical-align:middle"></span>${t('hc.cost')} (T1 Index + T2 + iDeCo)
         </div>
       </div>`;
     container.querySelectorAll('.hchart-period').forEach(btn=>{
@@ -2271,7 +2978,17 @@ function renderProjection(d, history, precomputedRates) {
   // Reuse rates computed in loadAndRender when available; only recompute if missing
   const rates=precomputedRates!==undefined?precomputedRates:(history.length>=2?computeRates(history):null);
 
-  const BUCKET_LABELS={t1_index:'T1 Index funds',t2:'T2 Stocks',t3a_ideco:'T3(a) iDeCo',t4:'T4 Real estate equity',t0:'T0 Cash',t1_hysa:'T1 HYSA',t1_gold:'T1 Gold',t3a_insurance:'T3(a) Insurance',t3b:'T3(b) 529'};
+  const BUCKET_LABELS={
+    t1_index:      t('bucket.t1_index'),
+    t2:            t('bucket.t2'),
+    t3a_ideco:     t('bucket.t3a_ideco'),
+    t4:            t('bucket.t4'),
+    t0:            t('bucket.t0'),
+    t1_hysa:       t('bucket.t1_hysa'),
+    t1_gold:       t('bucket.t1_gold'),
+    t3a_insurance: t('bucket.t3a_insurance'),
+    t3b:           t('bucket.t3b'),
+  };
   const HAS_CONTRIB=['t1_index','t2','t3a_ideco'];
 
   const currentFromHistory=(key)=>{
@@ -2283,16 +3000,16 @@ function renderProjection(d, history, precomputedRates) {
   };
 
   const warnHtml=histDays<30
-    ?`<div class="proj-warning red">Not enough data (${histDays} day${histDays!==1?'s':''} recorded) — enter rates manually to preview a projection, or wait until 30 days have been captured.</div>`
+    ?`<div class="proj-warning red">${t('proj.warn.tooFew', {n: histDays, s: histDays!==1?'s':''})}</div>`
     :histDays<365
-    ?`<div class="proj-warning yellow">Limited data (${histDays} days) — estimates may not reflect full annual contribution patterns.</div>`:'';
+    ?`<div class="proj-warning yellow">${t('proj.warn.limited', {n: histDays})}</div>`:'';
 
   // Rate assumptions table
   const dataBadge = histDays>=365
-    ? `<span class="rate-badge ok">${histDays}d</span>`
+    ? `<span class="rate-badge ok">${t('proj.histDays', {n: histDays})}</span>`
     : histDays>=30
-    ? `<span class="rate-badge warn">⚠ ${histDays}d</span>`
-    : `<span class="rate-badge err">⚠ ${histDays}d — insufficient</span>`;
+    ? `<span class="rate-badge warn">${t('proj.histDaysWarn', {n: histDays})}</span>`
+    : `<span class="rate-badge err">${t('proj.histDaysInsufficient', {n: histDays})}</span>`;
 
   const rateRows = Object.entries(BUCKET_LABELS).map(([key, label]) => {
     const r = rates && rates[key];
@@ -2301,7 +3018,7 @@ function renderProjection(d, history, precomputedRates) {
     const base = r ? r.annualBase : null;
     const sigma = r ? r.annualSigma : null;
     const clampBadge = (r && (r._baseClamped || r._sigmaClamped))
-      ? `<span title="Rate clamped to ±25%/yr to keep projection realistic" style="color:var(--yellow);margin-left:4px;cursor:help">⚠</span>`
+      ? `<span title="${t('proj.rateClampedTip')}" style="color:var(--yellow);margin-left:4px;cursor:help">⚠</span>`
       : '';
     const baseStr = base !== null
       ? `<span style="color:${base>=0?'var(--green)':'var(--red)'}">${base>=0?'+':''}${(base*100).toFixed(1)}%</span>${clampBadge}`
@@ -2312,27 +3029,27 @@ function renderProjection(d, history, precomputedRates) {
     let contribCell = '—';
     if (key === 't4' && r) {
       const payoff = r._paydownStartOffset > 0
-        ? `<span style="font-size:10px;color:var(--muted)">from Jun 2026</span>`
+        ? `<span style="font-size:10px;color:var(--muted)">${t('proj.rate.fromJun')}</span>`
         : '';
       contribCell = r.monthlyContrib > 0
-        ? `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}/mo</span> ${payoff}`
+        ? `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}${t('fire.swr.perMonth')}</span> ${payoff}`
         : `<span style="color:var(--muted)">—</span>`;
     } else if (r && r.monthlyContrib > 0) {
-      contribCell = `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}/mo</span>`;
+      contribCell = `<span style="color:var(--blue)">¥${Math.round(r.monthlyContrib).toLocaleString()}${t('fire.swr.perMonth')}</span>`;
     }
     return `<tr><td>${label}</td><td>${baseStr}</td><td>${sigmaStr}</td><td>${contribCell}</td></tr>`;
   }).join('');
 
   const rateTableHtml = `
   <details class="proj-rates-wrap">
-    <summary>Rate assumptions ${dataBadge}</summary>
+    <summary>${t('proj.ratesTitle')} ${dataBadge}</summary>
     <div class="card" style="padding:0;overflow-x:auto">
       <table class="proj-rates-tbl">
-        <thead><tr><th style="text-align:left">Bucket</th><th>Ann. return</th><th>±σ / yr</th><th style="text-align:left">Monthly contrib</th></tr></thead>
+        <thead><tr><th style="text-align:left">${t('proj.rate.bucket')}</th><th>${t('proj.rate.annual')}</th><th>${t('proj.rate.sigma')}</th><th style="text-align:left">${t('proj.rate.contrib')}</th></tr></thead>
         <tbody>${rateRows}</tbody>
       </table>
     </div>
-    ${histDays<30?`<div style="font-size:11px;color:var(--red);margin-top:6px">⚠ Rates shown are estimated from ${histDays} day${histDays!==1?'s':''} of data and are not reliable. Use manual mode for meaningful projections.</div>`:''}
+    ${histDays<30?`<div style="font-size:11px;color:var(--red);margin-top:6px">${t('proj.rate.unreliable', {n: histDays, s: histDays!==1?'s':''})}</div>`:''}
   </details>`;
 
   const manualCardsHtml=Object.entries(BUCKET_LABELS).map(([key,label])=>{
@@ -2341,8 +3058,8 @@ function renderProjection(d, history, precomputedRates) {
     const defRate=r?(r.annualBase*100).toFixed(1):'5.0';
     return `<div class="manual-card">
       <div class="manual-card-title">${label}</div>
-      ${HAS_CONTRIB.includes(key)?`<div class="manual-row"><label>¥/month</label><input id="mr_c_${key}" type="number" value="${defContrib}" step="10000"></div>`:''}
-      <div class="manual-row"><label>Return %</label><input id="mr_r_${key}" type="number" value="${defRate}" step="0.1"></div>
+      ${HAS_CONTRIB.includes(key)?`<div class="manual-row"><label>${t('proj.manual.amount')}</label><input id="mr_c_${key}" type="number" value="${defContrib}" step="10000"></div>`:''}
+      <div class="manual-row"><label>${t('proj.manual.return')}</label><input id="mr_r_${key}" type="number" value="${defRate}" step="0.1"></div>
     </div>`;
   }).join('');
 
@@ -2354,47 +3071,47 @@ function renderProjection(d, history, precomputedRates) {
     ${warnHtml}
     <div class="proj-inputs">
       <div class="proj-group">
-        <span class="proj-label">Time horizon — <span id="pHL">10 years</span></span>
+        <span class="proj-label">${t('proj.horizonPrefix')}<span id="pHL">${t('proj.horizon.unit', {n: defaultHorizon, s: defaultHorizon!==1?'s':''})}</span></span>
         <input type="range" id="pHorizon" min="1" max="30" value="10">
       </div>
       <div class="proj-group">
-        <span class="proj-label">Contributions</span>
+        <span class="proj-label">${t('proj.contributions')}</span>
         <select id="pContrib" class="proj-select">
-          <option value="auto">Historical pace</option>
-          <option value="manual">Manual input</option>
+          <option value="auto">${t('proj.contrib.auto')}</option>
+          <option value="manual">${t('proj.contrib.manual')}</option>
         </select>
       </div>
       <div class="proj-group" id="pStopGroup">
-        <span class="proj-label">Stop contributing from</span>
+        <span class="proj-label">${t('proj.stopFrom')}</span>
         <input type="month" id="pStopDate" class="proj-number" value="${horizonYM(defaultHorizon)}">
       </div>
       <div class="proj-group">
-        <span class="proj-label">NW target (¥)</span>
+        <span class="proj-label">${t('proj.nwTarget')}</span>
         <input type="number" id="pTarget" class="proj-number" placeholder="e.g. 100000000" step="1000000">
       </div>
       <div class="proj-group">
-        <span class="proj-label">Scope</span>
+        <span class="proj-label">${t('proj.scope')}</span>
         <select id="pScope" class="proj-select">
-          <option value="total">純資産合計 (Total NW)</option>
-          <option value="nfa">純金融資産 (NFA, T4 除外)</option>
-          <option value="excludeRE">不動産除外 (mortgage as liability)</option>
+          <option value="total">${t('proj.scope.total')}</option>
+          <option value="nfa">${t('proj.scope.nfa')}</option>
+          <option value="excludeRE">${t('proj.scope.excludeRE')}</option>
         </select>
       </div>
     </div>
-    <div id="pManual" style="display:none"><h2>Manual rates</h2><div class="manual-grid">${manualCardsHtml}</div></div>
+    <div id="pManual" style="display:none"><h2>${t('proj.manualTitle')}</h2><div class="manual-grid">${manualCardsHtml}</div></div>
     ${rateTableHtml}
     <div id="pLegend" style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-bottom:6px;font-size:11px;color:var(--muted);padding:2px 0;letter-spacing:.02em">
-      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>Optimistic</span>
-      <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>Base</span>
-      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#f85149"/></svg>Pessimistic</span>
-      <span title="-30% shock to T1 index, T2 stocks, T3a iDeCo in year 1, then compound at pessimistic rate (base − σ) — worst-case scenario" style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="rgba(139,148,158,0.85)" stroke-width="2" stroke-dasharray="2,3"/></svg>Worst case</span>
-      <span id="pLegendCoast" style="display:none;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/></svg>Coast FIRE</span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#3fb950"/></svg>${t('proj.legend.optimistic')}</span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#58a6ff" stroke-width="2.5"/></svg>${t('proj.legend.base')}</span>
+      <span style="display:flex;align-items:center;gap:6px"><svg width="10" height="10" style="flex-shrink:0"><circle cx="5" cy="5" r="4" fill="#f85149"/></svg>${t('proj.legend.pessimistic')}</span>
+      <span title="${t('proj.legend.worstCaseTip')}" style="display:flex;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="rgba(139,148,158,0.85)" stroke-width="2" stroke-dasharray="2,3"/></svg>${t('proj.legend.worstCase')}</span>
+      <span id="pLegendCoast" style="display:none;align-items:center;gap:6px"><svg width="20" height="10" style="flex-shrink:0"><line x1="0" y1="5" x2="20" y2="5" stroke="#f0883e" stroke-width="1.5" stroke-dasharray="5,3"/></svg>${t('proj.legend.coastFire')}</span>
     </div>
     <div class="card" style="padding:6px 6px 0"><div id="pChart"></div><div id="pAnnotation" style="padding:4px 6px 8px;font-size:12px"></div></div>
-    <div id="pLongWarn" style="display:none;margin-top:6px;font-size:11px;color:var(--yellow)">⚠ Long projection with limited history</div>
+    <div id="pLongWarn" style="display:none;margin-top:6px;font-size:11px;color:var(--yellow)">${t('proj.longWarn')}</div>
     <div class="card" style="padding:0;overflow-x:auto;margin-top:10px">
       <table class="proj-table">
-        <thead><tr><th style="text-align:left">Bucket</th><th>Current</th><th>Projected</th><th>Capital added</th><th>Returns</th><th>Ann. rate</th></tr></thead>
+        <thead><tr><th style="text-align:left">${t('proj.table.bucket')}</th><th>${t('proj.table.current')}</th><th>${t('proj.table.projected')}</th><th>${t('proj.table.capAdded')}</th><th>${t('proj.table.returns')}</th><th>${t('proj.table.rate')}</th></tr></thead>
         <tbody id="pTbody"></tbody>
         <tfoot><tr id="pTfoot"></tr></tfoot>
       </table>
@@ -2417,7 +3134,7 @@ function renderProjection(d, history, precomputedRates) {
     const excludeRE=scope==='excludeRE';
     const nfaOnly=scope==='nfa';
     const months=yrs*12;
-    document.getElementById('pHL').textContent=yrs+' year'+(yrs!==1?'s':'');
+    document.getElementById('pHL').textContent=t('proj.horizon.unit', {n: yrs, s: yrs!==1?'s':''});
     document.getElementById('pManual').style.display=mode==='manual'?'block':'none';
     if(document.getElementById('pStopGroup')) document.getElementById('pStopGroup').style.display=mode==='auto'?'flex':'none';
 
@@ -2454,7 +3171,7 @@ function renderProjection(d, history, precomputedRates) {
     // Total NW: pr.t4 keeps its default (property - mortgage) handling
 
     if(!Object.values(pr).some(r=>r.currentValue!==0)){
-      document.getElementById('pChart').innerHTML='<p style="color:var(--muted);text-align:center;padding:40px">No data available yet.</p>';
+      document.getElementById('pChart').innerHTML=`<p style="color:var(--muted);text-align:center;padding:40px">${t('proj.noData')}</p>`;
       return;
     }
 
@@ -2467,12 +3184,12 @@ function renderProjection(d, history, precomputedRates) {
       // Find when (NFA - mortgage) crosses zero
       const crossZero=projData.find(p=>p.base>=0);
       ann=crossZero
-        ?`<span style="font-size:12px;color:var(--green)">住宅ローン完済+純金融資産 net zero in ${Math.floor(crossZero.month/12)}y ${crossZero.month%12}m</span>`
-        :`<span style="font-size:12px;color:var(--muted)">net zero not reached within ${yrs} years</span>`;
+        ?`<span style="font-size:12px;color:var(--green)">${t('proj.annotation.netZero.reached', {y: Math.floor(crossZero.month/12), m: crossZero.month%12})}</span>`
+        :`<span style="font-size:12px;color:var(--muted)">${t('proj.annotation.netZero.notReached', {y: yrs})}</span>`;
     } else if(target>0){
       const hit=projData.find(p=>p.base>=target);
-      ann=hit?`<span style="font-size:12px;color:var(--green)">📈 Base reaches target in ${Math.floor(hit.month/12)}y ${hit.month%12}m</span>`
-             :`<span style="font-size:12px;color:var(--muted)">Base scenario does not reach target within ${yrs} years</span>`;
+      ann=hit?`<span style="font-size:12px;color:var(--green)">${t('proj.annotation.targetHit', {y: Math.floor(hit.month/12), m: hit.month%12})}</span>`
+             :`<span style="font-size:12px;color:var(--muted)">${t('proj.annotation.targetMissed', {y: yrs})}</span>`;
     }
     const longWarn=document.getElementById('pLongWarn');
     if(longWarn) longWarn.style.display=months>histDays*5?'block':'none';
@@ -2499,7 +3216,7 @@ function renderProjection(d, history, precomputedRates) {
       const coastCross = projData.find((p, i) => coastCurve[i] !== undefined && p.base >= coastCurve[i]);
       if (coastCross) {
         const ci = projData.indexOf(coastCross);
-        ann += (ann?'&ensp;':'') + `<span style="font-size:12px;color:#f0883e">🏖 Coast FIRE in ${Math.floor(coastCross.month/12)}y ${coastCross.month%12}m — contributions optional from then</span>`;
+        ann += (ann?'&ensp;':'') + `<span style="font-size:12px;color:#f0883e">${t('proj.annotation.coast', {y: Math.floor(coastCross.month/12), m: coastCross.month%12})}</span>`;
       }
     }
 
@@ -2527,11 +3244,11 @@ function renderProjection(d, history, precomputedRates) {
       }
       const ret=proj-r.currentValue-cap;
       totalCur+=r.currentValue; totalProj+=proj; totalCap+=cap; totalRet+=ret;
-      const rowLabel=excludeRE&&key==='t4'?'T4 Mortgage (liability)':label;
-      return `<tr><td>${rowLabel}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">${cap?'+'+fmt(cap):'—'}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${r._isLinearPaydown?'linear paydown':(r.annualBase*100).toFixed(1)+'%'}</td></tr>`;
+      const rowLabel=excludeRE&&key==='t4'?t('proj.t4LinearLabel'):label;
+      return `<tr><td>${rowLabel}</td><td>${fmt(r.currentValue)}</td><td>${fmt(proj)}</td><td class="gain">${cap?'+'+fmt(cap):'—'}</td><td class="${colorClass(ret)}">${sign(ret)}${fmt(ret)}</td><td style="color:var(--muted)">${r._isLinearPaydown?t('proj.table.linear'):(r.annualBase*100).toFixed(1)+'%'}</td></tr>`;
     }).join('');
-    const footerLabel = nfaOnly ? '純金融資産 (NFA)' : excludeRE ? 'NFA − 住宅ローン' : '純資産合計 (NW)';
-    document.getElementById('pTfoot').innerHTML=`<td>Total (${footerLabel})</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
+    const footerLabel = nfaOnly ? t('proj.scope.nfaLong') : excludeRE ? t('proj.scope.excludeRELong') : t('proj.scope.totalLong');
+    document.getElementById('pTfoot').innerHTML=`<td>${t('proj.table.total', {scope: footerLabel})}</td><td>${fmt(totalCur)}</td><td>${fmt(totalProj)}</td><td class="gain">${totalCap?'+'+fmt(totalCap):'—'}</td><td class="${colorClass(totalRet)}">${sign(totalRet)}${fmt(totalRet)}</td><td></td>`;
   }
 
   // Track whether user has manually overridden the stop date
@@ -2608,12 +3325,12 @@ function extract(rows, pfRows) {
 
   // Rows 10-15: tiers (T0–T4), row 16: total, row 17: goal
   const tierDefs = [
-    { id:'T0', color:'t0', labelEn:'Liquidity Buffer' },
-    { id:'T1', color:'t1', labelEn:'Core Portfolio' },
-    { id:'T2', color:'t2', labelEn:'Satellite' },
-    { id:'T3(a)', color:'t3a', labelEn:'Restricted (Retirement)' },
-    { id:'T3(b)', color:'t3b', labelEn:'Conditional Assets' },
-    { id:'T4', color:'t4', labelEn:'Real Estate' },
+    { id:'T0', color:'t0', labelEn:t('tier.label.t0') },
+    { id:'T1', color:'t1', labelEn:t('tier.label.t1') },
+    { id:'T2', color:'t2', labelEn:t('tier.label.t2') },
+    { id:'T3(a)', color:'t3a', labelEn:t('tier.label.t3a') },
+    { id:'T3(b)', color:'t3b', labelEn:t('tier.label.t3b') },
+    { id:'T4', color:'t4', labelEn:t('tier.label.t4') },
   ];
   d.tiers = tierDefs.map((def, i) => {
     const r = rows[10 + i] || [];
@@ -2720,7 +3437,7 @@ function trafficLight(actual, target, higherIsBad) {
 // ── Main render ───────────────────────────────────────────────────────────────
 function render(d) {
   const now = new Date();
-  const dateStr = now.toLocaleDateString('ja-JP', { year:'numeric', month:'long', day:'numeric' });
+  const dateStr = fmtDateLocal(now, { year:'numeric', month:'long', day:'numeric' });
   const incomePct = Math.min(100, Math.round(d.passiveIncomeActual / d.passiveIncomeTarget * 100));
 
   // Sort + pagination state
@@ -2756,23 +3473,23 @@ function render(d) {
     const end = Math.min((page + 1) * PAGE_SIZE, total);
     return `
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 10px 0;flex-wrap:wrap;gap:8px">
-        <span style="font-size:12px;color:var(--muted)">${start}–${end} / ${total}銘柄</span>
+        <span style="font-size:12px;color:var(--muted)">${t('hold.pageInfo', {start, end, total})}</span>
         <div style="display:flex;gap:6px">
-          <button class="page-btn" id="prevBtn" ${page === 0 ? 'disabled' : ''} aria-label="前のページ">‹</button>
+          <button class="page-btn" id="prevBtn" ${page === 0 ? 'disabled' : ''} aria-label="${t('hold.prev')}">‹</button>
           <span style="font-size:12px;color:var(--muted);align-self:center">${page + 1} / ${totalPages}</span>
-          <button class="page-btn" id="nextBtn" ${page >= totalPages - 1 ? 'disabled' : ''} aria-label="次のページ">›</button>
+          <button class="page-btn" id="nextBtn" ${page >= totalPages - 1 ? 'disabled' : ''} aria-label="${t('hold.next')}">›</button>
         </div>
       </div>`;
   }
 
   function holdingsTable() {
     const cols = [
-      { key:'tier',      label:'Tier' },
-      { key:'shorthand', label:'銘柄' },
-      { key:'value',     label:'時価' },
-      { key:'costBasis', label:'簿価' },
-      { key:'profit',    label:'損益' },
-      { key:'profitPct', label:'損益率' },
+      { key:'tier',      label:t('hold.tier')   },
+      { key:'shorthand', label:t('hold.name')   },
+      { key:'value',     label:t('hold.value')  },
+      { key:'costBasis', label:t('hold.cost')   },
+      { key:'profit',    label:t('hold.gain')   },
+      { key:'profitPct', label:t('hold.gainPct')},
     ];
     const ths = cols.map(c => {
       const cls = sortKey === c.key ? (sortDir === 1 ? 'sort-asc' : 'sort-desc') : '';
@@ -2786,7 +3503,7 @@ function render(d) {
             <thead><tr>${ths}</tr></thead>
             <tbody id="htbody">${holdingsRows()}</tbody>
             <tfoot><tr>
-              <td colspan="2">合計 (${d.holdings.length}銘柄)</td>
+              <td colspan="2">${t('hold.totalSymbols', {n: d.holdings.length})}</td>
               <td>${fmt(d.holdings.reduce((s,h) => s+h.value, 0))}</td>
               <td>${fmt(d.holdings.reduce((s,h) => s+h.costBasis, 0))}</td>
               <td class="${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}</td>
@@ -2807,18 +3524,19 @@ function render(d) {
           WealthTrack
         </div>
         <div class="tabs">
-          <button class="tab active" id="tabDash">Dashboard</button>
-          <button class="tab" id="tabProj">Projection</button>
+          <button class="tab active" id="tabDash">${t('tab.dashboard')}</button>
+          <button class="tab" id="tabProj">${t('tab.projection')}</button>
         </div>
       </div>
       <div class="header-meta">
-        <span class="badge">USD/JPY ${d.exchangeRate.toFixed(2)}</span>
+        <span class="badge">${t('common.usdJpy')} ${d.exchangeRate.toFixed(2)}</span>
         <span class="badge">${dateStr}</span>
-        <span id="syncBadge" class="sync-badge" title="最終同期">
+        <span id="syncBadge" class="sync-badge" title="${t('sync.title')}">
           <span class="sync-dot"></span>
-          <span id="syncText">同期中…</span>
+          <span id="syncText">${t('sync.syncing')}</span>
         </span>
-        <button class="btn" id="refreshBtn">↻ 更新</button>
+        <button class="page-btn" id="langToggle" title="Language / 言語">${t('header.lang.toggle')}</button>
+        <button class="btn" id="refreshBtn">${t('header.refresh')}</button>
       </div>
     </div>
     <div id="dashboard-content"></div>
@@ -2844,7 +3562,7 @@ function render(d) {
         const delta = d.totalNetWorth - oldNW;
         const pct   = oldNW ? (delta/oldNW*100) : 0;
         return `<div class="top-metric">
-          <div class="top-metric-title">前年同期比</div>
+          <div class="top-metric-title">${t('metric.yoy')}</div>
           <div class="top-metric-value ${colorClass(delta)}">${sign(delta)}${fmt(delta)}<span class="top-metric-sub">(${pct>=0?'+':''}${pct.toFixed(1)}%)</span></div>
         </div>`;
       })();
@@ -2852,58 +3570,58 @@ function render(d) {
       return `
       <div class="top-metrics">
         <div class="top-metric">
-          <div class="top-metric-title">純資産合計</div>
+          <div class="top-metric-title">${t('metric.totalNW')}</div>
           <div class="top-metric-value">${fmt(d.totalNetWorth)}</div>
         </div>
         <div class="top-metric">
-          <div class="top-metric-title">純金融資産 - 住宅ローン</div>
+          <div class="top-metric-title">${t('metric.nfaMinusMortgage')}</div>
           <div class="top-metric-value loss">${fmt(nfaMinusMortgage)}</div>
         </div>
         <div class="top-metric">
-          <div class="top-metric-title">純金融資産</div>
+          <div class="top-metric-title">${t('metric.nfa')}</div>
           <div class="top-metric-value gain">${fmt(d.netFinancialAssets)}</div>
         </div>
         <div class="top-metric">
-          <div class="top-metric-title">YTD損益</div>
+          <div class="top-metric-title">${t('metric.ytdGain')}</div>
           <div class="top-metric-value ${colorClass(d.ytdGain)}">${sign(d.ytdGain)}${fmt(d.ytdGain)}</div>
         </div>
         <div class="top-metric">
-          <div class="top-metric-title">全体損益</div>
+          <div class="top-metric-title">${t('metric.totalGain')}</div>
           <div class="top-metric-value ${colorClass(d.totalGain)}">${sign(d.totalGain)}${fmt(d.totalGain)}<span class="top-metric-sub">(${(()=>{const c=d.netFinancialAssets-d.totalGain;return c>0?(d.totalGain/c*100).toFixed(1):'0';})()}%)</span></div>
         </div>
         <div class="top-metric">
-          <div class="top-metric-title">年間パッシブ収入（実績/目標）</div>
+          <div class="top-metric-title">${t('metric.passiveIncome')}</div>
           <div class="top-metric-value">${fmt(d.passiveIncomeActual)} / ${fmt(d.passiveIncomeTarget)}</div>
         </div>
         ${_yoyHtml}
       </div>
 
-      <div class="section-divider">FIRE 進捗</div>
+      <div class="section-divider">${t('section.fireProgress')}</div>
       <div id="fireBarContainer"></div>
       <div id="milestoneContainer"></div>
       <div id="nwPulseContainer"></div>
 
-      <div class="section-divider">純資産推移</div>
+      <div class="section-divider">${t('section.nwHistory')}</div>
       <div id="historyChartContainer"></div>
 
-      <div class="section-divider">貯蓄 &amp; 積立</div>
+      <div class="section-divider">${t('section.savings')}</div>
       <div id="savingsRateContainer"></div>
       <div id="spendRunwayContainer"></div>
       <div id="annualContribContainer"></div>
 
-      <div class="section-divider">月次レビュー</div>
+      <div class="section-divider">${t('section.monthlyReview')}</div>
       <div id="aiMomContainer"></div>
       <div id="aiSummaryContainer"></div>
       <div id="waterfallContainer"></div>
 
-      <div class="section-divider">パッシブ収入</div>
+      <div class="section-divider">${t('section.passiveIncome')}</div>
       <div id="passiveIncomeContainer"></div>
 
       `;
     })()}
 
     <!-- Asset Tiers -->
-    <h2>資産 Tier</h2>
+    <h2>${t('section.assetTier')}</h2>
     ${(()=>{
       const _cs = getComputedStyle(document.documentElement);
       const DC = {
@@ -2928,8 +3646,8 @@ function render(d) {
         <div style="overflow-x:auto;flex:1;min-width:0">
           <table class="tier-table">
             <thead><tr>
-              <th>Tier</th><th>カテゴリ</th><th>資産種別</th>
-              <th style="text-align:right">金額</th>
+              <th>${t('tier.tier')}</th><th>${t('tier.category')}</th><th>${t('tier.types')}</th>
+              <th style="text-align:right">${t('tier.amount')}</th>
             </tr></thead>
             <tbody>
               ${d.tiers.map(t=>`
@@ -2942,7 +3660,7 @@ function render(d) {
             </tbody>
             <tfoot>
               <tr>
-                <td colspan="3" style="font-weight:700">合計</td>
+                <td colspan="3" style="font-weight:700">${t('tier.total')}</td>
                 <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(d.totalNetWorth)}</td>
               </tr>
             </tfoot>
@@ -2976,19 +3694,19 @@ function render(d) {
             <div class="lev-body">
               <div class="lev-actual ${cls}">${actual}</div>
               <div class="lev-target-col">
-                <div class="lev-target-label">目標</div>
+                <div class="lev-target-label">${t('lev.target')}</div>
                 <div class="lev-target-val ${cls}">${target}</div>
               </div>
             </div>
           </div>`;
       }
       return `
-      <h2>レバレッジ健全性</h2>
+      <h2>${t('section.leverage')}</h2>
       <div class="leverage-grid">
-        ${levCard('LTV（自己持分）',     d.ltv.eq,        d.ltv.result,        d.ltv.target,        'ltv')}
-        ${levCard('純資産カバー率',       d.nwCoverage.eq, d.nwCoverage.result, d.nwCoverage.target, 'nw')}
-        ${levCard('総責務÷年収',         d.debtIncome.eq, d.debtIncome.result, d.debtIncome.target, 'di')}
-        ${levCard('返済比率（額面ベース）', d.dscr.eq,      d.dscr.result,       d.dscr.target,       'dscr')}
+        ${levCard(t('lev.card.ltv'),     d.ltv.eq,        d.ltv.result,        d.ltv.target,        'ltv')}
+        ${levCard(t('lev.card.nwCov'),   d.nwCoverage.eq, d.nwCoverage.result, d.nwCoverage.target, 'nw')}
+        ${levCard(t('lev.card.di'),      d.debtIncome.eq, d.debtIncome.result, d.debtIncome.target, 'di')}
+        ${levCard(t('lev.card.dscr'),    d.dscr.eq,       d.dscr.result,       d.dscr.target,       'dscr')}
       </div>`;
     })()}
 
@@ -2996,7 +3714,7 @@ function render(d) {
     <div id="mortgageSimContainer"></div>
 
     <!-- Scorecard -->
-    <h2>スコアカード</h2>
+    <h2>${t('section.scorecard')}</h2>
     ${(()=>{
       const sc = d.scorecard;
       function scColor(rawVal, passFn, warnFn, isNum) {
@@ -3014,28 +3732,28 @@ function render(d) {
       return `
       <div class="card" style="padding:0;overflow-x:auto">
         <table class="sc-table">
-          <thead><tr><th>項目</th><th>目標</th><th>実績</th></tr></thead>
+          <thead><tr><th>${t('sc.col.item')}</th><th>${t('sc.col.target')}</th><th>${t('sc.col.actual')}</th></tr></thead>
           <tbody>
-            <tr class="sc-section"><td colspan="3">──  運用資産（T1 + T2）割合  ──</td></tr>
-            ${scRow('コア比率 (T1%)',      '>60%',   s0.rawVal||'', scColor(s0.rawVal||'', v=>v>=60, v=>v>=50, false))}
-            ${scRow('分散度 (投信%)',      '>40%',   s1.rawVal||'', scColor(s1.rawVal||'', v=>v>=40, v=>v>=30, false))}
-            ${scRow('集中度 (個別株%)',    '<40%',   s2.rawVal||'', scColor(s2.rawVal||'', v=>v<40,  v=>v<50,  false))}
-            ${scRow('銘柄上限',            '<10%',   s3.rawVal||'', scColor(s3.rawVal||'', v=>v<10,  v=>v<12,  false))}
-            ${scRow('銘柄上限（RSU除く）', '<5.0%',  '0.0%',        'sc-green')}
-            <tr class="sc-section"><td colspan="3">──  配当周り・ガードレール  ──</td></tr>
-            ${scRow('生活防衛資金（T0）',      '¥4.0M', fmtMOne(num(s4.rawVal||'0')), scColor(s4.rawVal||'0', v=>v>=4000000, v=>v>=3000000, true))}
-            ${scRow('現金比率（HYSA÷T1）', '<30%',   s5.rawVal||'', scColor(s5.rawVal||'', v=>v<30,  v=>v<35,  false))}
-            ${scRow('配当利回り',           '>2.5%',  s6.rawVal||'', scColor(s6.rawVal||'', v=>v>=2.5,v=>v>=2,  false))}
-            <tr class="sc-section"><td colspan="3">──  NISA関係  ──</td></tr>
-            ${scRow('2026年投資枠', '¥36M', d.nisa2026.pctStr, 'sc-yellow')}
-            ${scRow('生涯投資枠',   '¥18M', d.nisaLife.pctStr,  'sc-yellow')}
+            <tr class="sc-section"><td colspan="3">${t('sc.section.allocation')}</td></tr>
+            ${scRow(t('sc.row.coreRatio'),         '>60%',   s0.rawVal||'', scColor(s0.rawVal||'', v=>v>=60, v=>v>=50, false))}
+            ${scRow(t('sc.row.diversification'),   '>40%',   s1.rawVal||'', scColor(s1.rawVal||'', v=>v>=40, v=>v>=30, false))}
+            ${scRow(t('sc.row.concentration'),     '<40%',   s2.rawVal||'', scColor(s2.rawVal||'', v=>v<40,  v=>v<50,  false))}
+            ${scRow(t('sc.row.positionCap'),       '<10%',   s3.rawVal||'', scColor(s3.rawVal||'', v=>v<10,  v=>v<12,  false))}
+            ${scRow(t('sc.row.positionCapNoRsu'),  '<5.0%',  '0.0%',        'sc-green')}
+            <tr class="sc-section"><td colspan="3">${t('sc.section.guardrails')}</td></tr>
+            ${scRow(t('sc.row.emergencyFund'),     '¥4.0M', fmtMOne(num(s4.rawVal||'0')), scColor(s4.rawVal||'0', v=>v>=4000000, v=>v>=3000000, true))}
+            ${scRow(t('sc.row.cashRatio'),         '<30%',   s5.rawVal||'', scColor(s5.rawVal||'', v=>v<30,  v=>v<35,  false))}
+            ${scRow(t('sc.row.divYield'),          '>2.5%',  s6.rawVal||'', scColor(s6.rawVal||'', v=>v>=2.5,v=>v>=2,  false))}
+            <tr class="sc-section"><td colspan="3">${t('sc.section.nisa')}</td></tr>
+            ${scRow(t('sc.row.nisa2026'),          '¥36M', d.nisa2026.pctStr, 'sc-yellow')}
+            ${scRow(t('sc.row.nisaLife'),          '¥18M', d.nisaLife.pctStr,  'sc-yellow')}
           </tbody>
         </table>
       </div>`;
     })()}
 
     <!-- Sector Allocation -->
-    <h2>セクター配分</h2>
+    <h2>${t('section.sectors')}</h2>
     <div class="card">
       ${d.sectors.map(s => `
       <div class="sector-row">
@@ -3048,7 +3766,7 @@ function render(d) {
     </div>
 
     <!-- Holdings -->
-    <h2>保有銘柄一覧</h2>
+    <h2>${t('section.holdings')}</h2>
     ${holdingsTable()}
 
     <div style="height:32px"></div>
@@ -3110,7 +3828,7 @@ function render(d) {
       <div class="holdings-wrap" style="margin-top:8px">
         <table class="holdings-table" id="htable">
           <thead><tr>${
-            [['tier','Tier'],['shorthand','銘柄'],['value','時価'],['costBasis','簿価'],['profit','損益'],['profitPct','損益率']]
+            [['tier',t('hold.tier')],['shorthand',t('hold.name')],['value',t('hold.value')],['costBasis',t('hold.cost')],['profit',t('hold.gain')],['profitPct',t('hold.gainPct')]]
             .map(([key,label]) => {
               const cls = sortKey === key ? (sortDir===1?'sort-asc':'sort-desc') : '';
               return `<th class="${cls}" data-key="${key}">${label}</th>`;
@@ -3133,6 +3851,8 @@ function render(d) {
 
   // Refresh button
   document.getElementById('refreshBtn').addEventListener('click', () => loadAndRender());
+  const langBtn = document.getElementById('langToggle');
+  if (langBtn) langBtn.addEventListener('click', () => setLang(_lang === 'en' ? 'ja' : 'en'));
 }
 
 function tierColorClass(tier) {
@@ -3149,7 +3869,7 @@ async function loadAndRender() {
   _syncStatus = 'syncing';
   updateSyncBadge();
   loadEl.style.display = 'block';
-  loadEl.textContent = 'データ読み込み中...';
+  loadEl.textContent = t('common.loading');
   dashEl.style.display = 'none';
   try {
     const [cleanRes, pfRes, histRes] = await Promise.all([fetch(CLEAN_URL), fetch(PORTFOLIO_URL), fetch(HISTORY_URL)]);
@@ -3167,7 +3887,7 @@ async function loadAndRender() {
   } catch (err) {
     _syncStatus = 'fail';
     updateSyncBadge();
-    loadEl.innerHTML = `<div class="error-box">⚠️ データの読み込みに失敗しました: ${err.message}<br>スプレッドシートが公開設定になっているか確認してください。</div>`;
+    loadEl.innerHTML = `<div class="error-box">${t('common.error.load', {msg: err.message})}</div>`;
   } finally {
     if (btn) btn.disabled = false;
   }
