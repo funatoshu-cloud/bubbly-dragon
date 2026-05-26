@@ -144,6 +144,16 @@ svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui
 
 /* Savings rate */
 .sr-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:10px; }
+.spend-card { padding:14px 16px; margin-bottom:10px; }
+.spend-section { display:flex; flex-direction:column; gap:4px; }
+.spend-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:6px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.spend-row { display:flex; align-items:baseline; gap:8px; font-size:12px; flex-wrap:wrap; padding:2px 0; }
+.spend-row.total { padding-top:6px; margin-top:4px; border-top:1px solid rgba(255,255,255,0.05); font-weight:600; }
+.spend-label { color:var(--muted); min-width:140px; flex-shrink:0; }
+.spend-val { font-variant-numeric:tabular-nums; font-weight:700; }
+.spend-sub { font-size:10px; color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0; }
+.spend-info { font-size:11px; color:var(--muted); cursor:help; }
+.spend-divider { height:1px; background:rgba(255,255,255,0.06); margin:12px 0; }
 .sr-rate { font-size:34px; font-weight:700; line-height:1; font-variant-numeric:tabular-nums; }
 .sr-sub  { font-size:11px; color:var(--muted); margin-top:4px; }
 .sr-bar-track { height:4px; background:rgba(255,255,255,0.07); border-radius:2px; margin-top:12px; overflow:hidden; }
@@ -1033,6 +1043,83 @@ function renderAnnualContrib(history, container) {
   </div>`;
 }
 
+// ── Derived Spend + Runway ────────────────────────────────────────────────────
+function renderSpendRunway(history, d, rates, container) {
+  if (!container) return;
+  const cf = computeMonthlyCashFlow(history, d);
+  if (!cf) { container.innerHTML = ''; return; }
+  // Defensive: bonus months or noisy data can push lifestyle below 0
+  if (cf.totalBurn <= 0) { container.innerHTML = ''; return; }
+
+  // Weighted base annual rate across NFA buckets (same approach as projection coast FIRE)
+  const NFA_KEYS = ['t1_index','t2','t3a_ideco','t0','t1_hysa','t1_gold','t3a_insurance','t3b'];
+  let totalCV = 0, weightedAnnual = 0;
+  if (rates) {
+    for (const key of NFA_KEYS) {
+      const r = rates[key]; if (!r) continue;
+      const cv = Math.max(0, r.currentValue);
+      totalCV += cv;
+      weightedAnnual += cv * r.annualBase;
+    }
+  }
+  const annualRate = totalCV > 0 ? weightedAnnual / totalCV : 0.04;
+  const monthlyRate = annualRate / 12;
+
+  const nfa = d.netFinancialAssets;
+  const runway = computeRunway(nfa, cf.totalBurn, monthlyRate);
+  const swr = nfa * 0.04;
+  const swrCoverage = Math.min(999, swr / (cf.totalBurn * 12) * 100);
+
+  const fmtY = v => fmt(Math.round(v));
+  const lifestyleColor = cf.lifestyle < cf.income * 0.5 ? 'var(--green)' : cf.lifestyle < cf.income * 0.75 ? 'var(--yellow)' : 'var(--red)';
+  const runwayStr = !runway.depleted
+    ? `50年以上持続`
+    : `約 ${Math.floor(runway.months/12)}年${runway.months%12 ? runway.months%12+'ヶ月' : ''}`;
+  const runwayColor = !runway.depleted ? 'var(--green)' : runway.months/12 >= 25 ? 'var(--green)' : runway.months/12 >= 10 ? 'var(--yellow)' : 'var(--red)';
+  const swrColor = swrCoverage >= 100 ? 'var(--green)' : swrCoverage >= 50 ? 'var(--yellow)' : 'var(--red)';
+
+  const methodTip = "月収から既知の貯蓄系流出 (投資積立, ローン返済, 流動性資産増分, 保険積立) を差し引いた残額。ボーナス月や臨時支出で変動するため複数月の平均で表示。";
+
+  container.innerHTML = `<div class="card spend-card">
+    <div class="spend-section">
+      <div class="spend-title">
+        推定月次支出
+        <span class="spend-sub">(${cf.monthsUsed}ヶ月平均 · 月収から逆算)</span>
+        <span class="spend-info" title="${methodTip}">ⓘ</span>
+      </div>
+      <div class="spend-row">
+        <span class="spend-label">推定生活費</span>
+        <span class="spend-val" style="color:${lifestyleColor}">${fmtY(cf.lifestyle)}/月</span>
+        <span class="spend-sub">(${(cf.lifestyle/cf.income*100).toFixed(0)}% of 月収)</span>
+      </div>
+      ${cf.mortgagePmt > 0 ? `<div class="spend-row">
+        <span class="spend-label">住宅ローン</span>
+        <span class="spend-val">${fmtY(cf.mortgagePmt)}/月</span>
+        <span class="spend-sub">元利金等</span>
+      </div>` : ''}
+      <div class="spend-row total">
+        <span class="spend-label">合計月次バーン</span>
+        <span class="spend-val">${fmtY(cf.totalBurn)}/月</span>
+        <span class="spend-sub">${fmtY(cf.totalBurn*12)}/年</span>
+      </div>
+    </div>
+    <div class="spend-divider"></div>
+    <div class="spend-section">
+      <div class="spend-title">ランウェイ <span class="spend-sub">(今日仕事を辞めたら)</span></div>
+      <div class="spend-row">
+        <span class="spend-label">純金融資産持続期間</span>
+        <span class="spend-val" style="color:${runwayColor}">${runwayStr}</span>
+        <span class="spend-sub">@ 想定利回り ${(annualRate*100).toFixed(1)}%</span>
+      </div>
+      <div class="spend-row">
+        <span class="spend-label">4%ルール カバー率</span>
+        <span class="spend-val" style="color:${swrColor}">${swrCoverage.toFixed(0)}%</span>
+        <span class="spend-sub">${fmtY(swr)}/年 vs 必要 ${fmtY(cf.totalBurn*12)}/年</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 // ── Savings Rate ──────────────────────────────────────────────────────────────
 function renderSavingsRate(d, waterfallData, container) {
   if (!waterfallData || !waterfallData.length) { container.innerHTML = ''; return; }
@@ -1571,6 +1658,73 @@ function renderFireBar(d, container) {
 }
 
 // ── Monthly Waterfall ─────────────────────────────────────────────────────────
+// ── Derived monthly cash flow ─────────────────────────────────────────────────
+// Uses the cash-flow identity to back out lifestyle spend without manual entry:
+// income = invest contrib + Δliquid + Δinsurance + mortgage PMT + lifestyle
+// All four "savings-side" outflows are already tracked in history. Lifestyle
+// is the residual. Averaged over up to 3 trailing months for stability.
+function computeMonthlyCashFlow(history, d) {
+  if (!history || history.length < 2 || !d.monthlyIncome) return null;
+
+  const monthMap = new Map();
+  for (const row of history) {
+    const key = `${row.date.getFullYear()}-${String(row.date.getMonth()+1).padStart(2,'0')}`;
+    monthMap.set(key, row);
+  }
+  const monthRows = [...monthMap.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([,r])=>r);
+  if (monthRows.length < 2) return null;
+
+  const pairs = [];
+  for (let i = monthRows.length - 1; i > 0 && pairs.length < 3; i--) {
+    pairs.unshift([monthRows[i-1], monthRows[i]]);
+  }
+
+  // Full mortgage PMT (principal + interest) — only active from June 1 2026
+  const lastMort = history[history.length-1].t4_mortgage || 0;
+  const mortStartDate = new Date('2026-06-01');
+  let fullMortPmt = 0;
+  if (lastMort > 0) {
+    const mr = MORTGAGE_RATE/12, n = MORTGAGE_TERM_YEARS*12;
+    fullMortPmt = lastMort * mr / (1 - Math.pow(1+mr, -n));
+  }
+
+  const avg = (fn) => pairs.reduce((s, [p,c]) => s + fn(p,c), 0) / pairs.length;
+  const avgContrib    = avg((p,c) => ((c.t1_index_cost||0)-(p.t1_index_cost||0)) + ((c.t2_cost||0)-(p.t2_cost||0)) + ((c.t3a_ideco_cost||0)-(p.t3a_ideco_cost||0)));
+  const avgDLiquid    = avg((p,c) => ((c.t0_value||0)-(p.t0_value||0)) + ((c.t1_hysa||0)-(p.t1_hysa||0)));
+  const avgDInsurance = avg((p,c) => ((c.t3a_insurance||0)-(p.t3a_insurance||0)));
+  const avgMortPmt    = pairs.reduce((s, [,c]) => {
+    const pm = new Date(c.date.getFullYear(), c.date.getMonth(), 1);
+    return s + (pm >= mortStartDate ? fullMortPmt : 0);
+  }, 0) / pairs.length;
+
+  const lifestyle = d.monthlyIncome - avgContrib - avgDLiquid - avgDInsurance - avgMortPmt;
+  const totalBurn = lifestyle + avgMortPmt;  // what you'd still spend if income stopped
+
+  return {
+    monthsUsed:     pairs.length,
+    income:         d.monthlyIncome,
+    investContrib:  avgContrib,
+    dLiquid:        avgDLiquid,
+    dInsurance:     avgDInsurance,
+    mortgagePmt:    avgMortPmt,
+    lifestyle,
+    totalBurn,
+  };
+}
+
+// Runway: iterate NFA drawdown at monthly burn while compounding remaining balance.
+// Returns { months, depleted }. depleted=false means portfolio survives 50+ years.
+function computeRunway(nfa, monthlyBurn, monthlyRate) {
+  if (monthlyBurn <= 0) return { months: Infinity, depleted: false };
+  if (nfa <= 0) return { months: 0, depleted: true };
+  let bal = nfa;
+  for (let m = 0; m < 600; m++) {
+    bal = bal * (1 + monthlyRate) - monthlyBurn;
+    if (bal <= 0) return { months: m + 1, depleted: true };
+  }
+  return { months: 600, depleted: false };
+}
+
 function buildWaterfallData(history) {
   if (!history || history.length < 2) return [];
   const finVal = r => (r.t1_index_value||0)+(r.t2_value||0)+(r.t3a_ideco_value||0)+(r.t0_value||0)+(r.t1_gold||0)+(r.t1_hysa||0)+(r.t3a_insurance||0)+(r.t3b_value||0);
@@ -2734,6 +2888,7 @@ function render(d) {
 
       <div class="section-divider">貯蓄 &amp; 積立</div>
       <div id="savingsRateContainer"></div>
+      <div id="spendRunwayContainer"></div>
       <div id="annualContribContainer"></div>
 
       <div class="section-divider">月次レビュー</div>
@@ -2908,6 +3063,7 @@ function render(d) {
   renderNWPulse(_history, d, document.getElementById('nwPulseContainer'));
   renderHistoryChart(_history, document.getElementById('historyChartContainer'));
   renderSavingsRate(d, _waterfallData, document.getElementById('savingsRateContainer'));
+  renderSpendRunway(_history, d, _rates, document.getElementById('spendRunwayContainer'));
   renderAnnualContrib(_history, document.getElementById('annualContribContainer'));
   renderMoMSnapshot(d, _waterfallData, document.getElementById('aiMomContainer'));
   renderAISummary(d, _waterfallData, document.getElementById('aiSummaryContainer'));
